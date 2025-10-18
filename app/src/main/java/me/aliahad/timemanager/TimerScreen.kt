@@ -7,16 +7,19 @@ import android.media.RingtoneManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,14 +30,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import me.aliahad.timemanager.data.Preset
+import me.aliahad.timemanager.data.PresetRepository
+import me.aliahad.timemanager.data.TimerDatabase
 
 @Composable
 fun TimerScreen() {
     val context = LocalContext.current
+    val database = remember { TimerDatabase.getDatabase(context) }
+    val repository = remember { PresetRepository(database.presetDao()) }
+    val presets by repository.allPresets.collectAsState(initial = emptyList())
+    
     var hours by remember { mutableIntStateOf(0) }
     var minutes by remember { mutableIntStateOf(25) }
     var isRunning by remember { mutableStateOf(false) }
@@ -43,6 +55,8 @@ fun TimerScreen() {
     var remainingSeconds by remember { mutableIntStateOf(0) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var vibrator by remember { mutableStateOf<Vibrator?>(null) }
+    var showPresets by remember { mutableStateOf(false) }
+    var showSaveDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(isRunning) {
@@ -74,15 +88,68 @@ fun TimerScreen() {
         ) {
             Spacer(modifier = Modifier.height(40.dp))
 
-            Text(
-                text = "Timer",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontWeight = FontWeight.Bold
-                ),
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Empty spacer for symmetry
+                Spacer(modifier = Modifier.width(48.dp))
+                
+                Text(
+                    text = "Timer",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                
+                IconButton(
+                    onClick = { showSaveDialog = true },
+                    enabled = !isRunning && (hours > 0 || minutes > 0)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.BookmarkAdd,
+                        contentDescription = "Save Preset",
+                        tint = if (!isRunning && (hours > 0 || minutes > 0)) 
+                            MaterialTheme.colorScheme.primary 
+                        else 
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    )
+                }
+            }
 
-            Spacer(modifier = Modifier.height(60.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            // Preset list - horizontal scroll
+            if (presets.isNotEmpty()) {
+                PresetList(
+                    presets = presets,
+                    onPresetClick = { preset ->
+                        if (!isRunning && !isAlarmRinging) {
+                            // Set the time
+                            hours = preset.hours
+                            minutes = preset.minutes
+                            
+                            // Start the timer immediately
+                            val total = preset.hours * 3600 + preset.minutes * 60
+                            if (total > 0) {
+                                totalSeconds = total
+                                remainingSeconds = total
+                                isRunning = true
+                            }
+                        }
+                    },
+                    onDeletePreset = { preset ->
+                        scope.launch {
+                            repository.deletePreset(preset)
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             AnimatedContent(
                 targetState = when {
@@ -145,12 +212,14 @@ fun TimerScreen() {
                             shape = RoundedCornerShape(28.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary
-                            )
+                            ),
+                            contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp)
                         ) {
                             Text(
                                 text = "Dismiss",
                                 fontSize = 18.sp,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
                             )
                         }
                     }
@@ -162,16 +231,18 @@ fun TimerScreen() {
                                 remainingSeconds = 0
                             },
                             modifier = Modifier
-                                .size(80.dp),
+                                .size(90.dp),
                             shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.error
-                            )
+                            ),
+                            contentPadding = PaddingValues(0.dp)
                         ) {
                             Text(
                                 text = "Stop",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
                             )
                         }
                     }
@@ -187,17 +258,19 @@ fun TimerScreen() {
                                 }
                             },
                             modifier = Modifier
-                                .size(80.dp),
+                                .size(90.dp),
                             shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary
                             ),
-                            enabled = hours > 0 || minutes > 0
+                            enabled = hours > 0 || minutes > 0,
+                            contentPadding = PaddingValues(0.dp)
                         ) {
                             Text(
                                 text = "Start",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
                             )
                         }
                     }
@@ -213,6 +286,27 @@ fun TimerScreen() {
             mediaPlayer?.release()
             vibrator?.cancel()
         }
+    }
+    
+    // Save Preset Dialog
+    if (showSaveDialog) {
+        SavePresetDialog(
+            hours = hours,
+            minutes = minutes,
+            onDismiss = { showSaveDialog = false },
+            onSave = { presetName ->
+                scope.launch {
+                    repository.insertPreset(
+                        Preset(
+                            name = presetName,
+                            hours = hours,
+                            minutes = minutes
+                        )
+                    )
+                    showSaveDialog = false
+                }
+            }
+        )
     }
 }
 
@@ -379,26 +473,56 @@ fun NumberPicker(
     label: String,
     modifier: Modifier = Modifier
 ) {
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = value
-    )
+    val context = LocalContext.current
+    val vibrator = remember { context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator }
+    var lastVibratedValue by remember { mutableIntStateOf(value) }
+    
+    val listState = rememberLazyListState()
     val snapBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+    
+    // Scroll to initial value on first composition
+    LaunchedEffect(Unit) {
+        listState.scrollToItem(value)
+    }
 
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (!listState.isScrollInProgress) {
-            val index = listState.firstVisibleItemIndex +
-                    if (listState.firstVisibleItemScrollOffset > 30) 1 else 0
-            onValueChange(index.coerceIn(range))
+    // Derive the current center value from scroll state
+    val currentCenterValue by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val viewportCenter = layoutInfo.viewportStartOffset + layoutInfo.viewportSize.height / 2
+            
+            layoutInfo.visibleItemsInfo
+                .minByOrNull { item ->
+                    val itemCenter = item.offset + item.size / 2
+                    kotlin.math.abs(itemCenter - viewportCenter)
+                }
+                ?.index?.coerceIn(range) ?: value
+        }
+    }
+    
+    // Handle value changes and haptic feedback
+    LaunchedEffect(currentCenterValue, listState.isScrollInProgress) {
+        if (currentCenterValue != lastVibratedValue) {
+            if (listState.isScrollInProgress) {
+                // Haptic feedback during scroll
+                vibrator.vibrate(VibrationEffect.createOneShot(8, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+            lastVibratedValue = currentCenterValue
+        }
+        
+        if (!listState.isScrollInProgress && currentCenterValue != value) {
+            // Update value when scroll stops
+            onValueChange(currentCenterValue)
         }
     }
 
     Box(
         modifier = modifier
             .height(200.dp)
-            .width(100.dp),
+            .width(120.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Selection indicator
+        // Selection indicator - positioned at center
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -411,14 +535,15 @@ fun NumberPicker(
             state = listState,
             flingBehavior = snapBehavior,
             horizontalAlignment = Alignment.CenterHorizontally,
+            contentPadding = PaddingValues(vertical = 70.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             items(range.count()) { index ->
                 val itemValue = range.first + index
-                val isSelected = itemValue == value
+                val isSelected = itemValue == currentCenterValue
                 
                 val alpha by animateFloatAsState(
-                    targetValue = if (isSelected) 1f else 0.3f,
+                    targetValue = if (isSelected) 1f else 0.4f,
                     animationSpec = tween(200),
                     label = "alpha"
                 )
@@ -436,7 +561,7 @@ fun NumberPicker(
                         Text(
                             text = String.format("%02d", itemValue),
                             style = MaterialTheme.typography.displaySmall.copy(
-                                fontSize = if (isSelected) 42.sp else 36.sp,
+                                fontSize = if (isSelected) 42.sp else 34.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             ),
                             color = MaterialTheme.colorScheme.onBackground,
@@ -446,8 +571,10 @@ fun NumberPicker(
                         if (isSelected) {
                             Text(
                                 text = " $label",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontSize = 16.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                                 modifier = Modifier.padding(start = 4.dp)
                             )
                         }
@@ -485,5 +612,161 @@ private fun createMediaPlayer(context: Context): MediaPlayer? {
         e.printStackTrace()
         null
     }
+}
+
+@Composable
+fun PresetList(
+    presets: List<Preset>,
+    onPresetClick: (Preset) -> Unit,
+    onDeletePreset: (Preset) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    androidx.compose.foundation.lazy.LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp)
+    ) {
+        items(presets, key = { it.id }) { preset ->
+            PresetChip(
+                preset = preset,
+                onClick = { onPresetClick(preset) },
+                onDelete = { onDeletePreset(preset) }
+            )
+        }
+    }
+}
+
+@Composable
+fun PresetChip(
+    preset: Preset,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    
+    Card(
+        modifier = Modifier
+            .width(140.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    text = preset.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Timer,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = buildString {
+                        if (preset.hours > 0) append("${preset.hours}h ")
+                        append("${preset.minutes}m")
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SavePresetDialog(
+    hours: Int,
+    minutes: Int,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var presetName by remember { mutableStateOf("") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Save Preset",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Duration: ${if (hours > 0) "${hours}h " else ""}${minutes}min",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                
+                OutlinedTextField(
+                    value = presetName,
+                    onValueChange = { presetName = it },
+                    label = { Text("Preset Name") },
+                    placeholder = { Text("e.g., Pomodoro, Break") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { 
+                    if (presetName.isNotBlank()) {
+                        onSave(presetName.trim())
+                    }
+                },
+                enabled = presetName.isNotBlank()
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 

@@ -267,7 +267,7 @@ Ideas for future versions:
 ## 📞 Contact & Support
 
 - **Developer**: Ali Ahad
-- **Email**: your.email@example.com
+- **Email**: ali@aliahad.me
 - **Website**: [aliahad.me](https://aliahad.me)
 
 ---
