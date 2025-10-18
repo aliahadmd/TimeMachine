@@ -133,7 +133,7 @@ Welcome to the first release of Pomodoro Timer! A beautiful, minimal timer app f
 
 None at launch! 🎉
 
-If you find any bugs, please report them in the [Issues](https://github.com/YOUR_USERNAME/TimeManager/issues) section.
+If you find any bugs, please report them in the [Issues](https://github.com/aliahadmd/TimeManager/issues) section.
 
 ---
 
@@ -165,8 +165,8 @@ The app requests these permissions:
 
 We'd love to hear from you!
 
-- 🐛 **Report Bugs**: [Open an issue](https://github.com/YOUR_USERNAME/TimeManager/issues)
-- 💡 **Request Features**: [Submit an idea](https://github.com/YOUR_USERNAME/TimeManager/issues)
+- 🐛 **Report Bugs**: [Open an issue](https://github.com/aliahadmd/TimeManager/issues)
+- 💡 **Request Features**: [Submit an idea](https://github.com/aliahadmd/TimeManager/issues)
 - ⭐ **Star the Repo**: Show your support on GitHub
 - 📢 **Share**: Tell your friends about Pomodoro Timer
 
@@ -198,10 +198,10 @@ If you find this app useful, please:
 
 ## 🔗 Links
 
-- **GitHub Repository**: https://github.com/YOUR_USERNAME/TimeManager
+- **GitHub Repository**: https://github.com/aliahadmd/TimeManager
 - **Download APK**: [See attachments below]
-- **Documentation**: [README.md](https://github.com/YOUR_USERNAME/TimeManager/blob/main/README.md)
-- **Report Issues**: [Issue Tracker](https://github.com/YOUR_USERNAME/TimeManager/issues)
+- **Documentation**: [README.md](https://github.com/aliahadmd/TimeManager/blob/main/README.md)
+- **Report Issues**: [Issue Tracker](https://github.com/aliahadmd/TimeManager/issues)
 - **Developer**: Ali Ahad (aliahad.me)
 
 ---

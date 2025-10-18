@@ -57,7 +57,7 @@ Your app is **100% ready for GitHub release!** 🎉
 git init
 git add .
 git commit -m "Initial commit - Pomodoro Timer v1.0.0"
-git remote add origin https://github.com/YOUR_USERNAME/TimeManager.git
+git remote add origin https://github.com/aliahadmd/TimeManager.git
 git branch -M main
 git push -u origin main
 
@@ -188,7 +188,7 @@ cd /Volumes/essd/TimeManager
 git init
 git add .
 git commit -m "Initial commit - Pomodoro Timer v1.0.0"
-git remote add origin https://github.com/YOUR_USERNAME/TimeManager.git
+git remote add origin https://github.com/aliahadmd/TimeManager.git
 git branch -M main
 git push -u origin main
 ```
@@ -222,7 +222,7 @@ A beautiful, minimal timer app for Android
 🌓 Auto dark/light mode
 🆓 100% free & open source
 
-📥 Download: https://github.com/YOUR_USERNAME/TimeManager/releases
+📥 Download: https://github.com/aliahadmd/TimeManager/releases
 
 #AndroidDev #Kotlin #JetpackCompose #OpenSource
 ```

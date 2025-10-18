@@ -135,11 +135,11 @@ git push origin v1.0.1
 #### Option A: Using GitHub Web Interface
 
 1. **Navigate to Repository**
-   - Go to `https://github.com/YOUR_USERNAME/TimeManager`
+   - Go to `https://github.com/aliahadmd/TimeManager`
 
 2. **Access Releases**
    - Click "Releases" (right sidebar)
-   - Or go to `https://github.com/YOUR_USERNAME/TimeManager/releases`
+   - Or go to `https://github.com/aliahadmd/TimeManager/releases`
 
 3. **Draft New Release**
    - Click "Draft a new release" button
@@ -220,9 +220,9 @@ Create `RELEASE_NOTES.md` for each version:
 
 ## 🔗 Links
 
-- **Full Changelog**: https://github.com/YOUR_USERNAME/TimeManager/compare/v1.0.0...v1.0.1
-- **Documentation**: [README.md](https://github.com/YOUR_USERNAME/TimeManager/blob/main/README.md)
-- **Report Issues**: [Issue Tracker](https://github.com/YOUR_USERNAME/TimeManager/issues)
+- **Full Changelog**: https://github.com/aliahadmd/TimeManager/compare/v1.0.0...v1.0.1
+- **Documentation**: [README.md](https://github.com/aliahadmd/TimeManager/blob/main/README.md)
+- **Report Issues**: [Issue Tracker](https://github.com/aliahadmd/TimeManager/issues)
 
 ---
 

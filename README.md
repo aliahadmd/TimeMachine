@@ -11,7 +11,7 @@
 
 Perfect for Pomodoro technique, focus sessions, breaks, meditation, cooking, and more!
 
-[Download APK](https://github.com/YOUR_USERNAME/TimeManager/releases/latest) • [Report Bug](https://github.com/YOUR_USERNAME/TimeManager/issues) • [Request Feature](https://github.com/YOUR_USERNAME/TimeManager/issues)
+[Download APK](https://github.com/aliahadmd/TimeManager/releases/latest) • [Report Bug](https://github.com/aliahadmd/TimeManager/issues) • [Request Feature](https://github.com/aliahadmd/TimeManager/issues)
 
 </div>
 
@@ -55,7 +55,7 @@ Perfect for Pomodoro technique, focus sessions, breaks, meditation, cooking, and
 ## 📥 Installation
 
 ### Download APK
-1. Go to [Releases](https://github.com/YOUR_USERNAME/TimeManager/releases/latest)
+1. Go to [Releases](https://github.com/aliahadmd/TimeManager/releases/latest)
 2. Download `PomodoroTimer-v1.0.0.apk`
 3. Enable "Install from Unknown Sources" in your Android settings
 4. Open the APK and install
@@ -109,7 +109,7 @@ The classic Pomodoro technique:
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/TimeManager.git
+git clone https://github.com/aliahadmd/TimeManager.git
 cd TimeManager
 
 # Build debug APK
@@ -219,7 +219,7 @@ Download `PomodoroTimer-v1.0.1.apk` below and install on your Android device.
 
 **Minimum Android Version**: Android 12 (API 31)
 
-**Full Changelog**: https://github.com/YOUR_USERNAME/TimeManager/compare/v1.0.0...v1.0.1
+**Full Changelog**: https://github.com/aliahadmd/TimeManager/compare/v1.0.0...v1.0.1
 ```
 
 ---
@@ -246,7 +246,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 None at the moment! 🎉
 
-If you find any bugs, please [open an issue](https://github.com/YOUR_USERNAME/TimeManager/issues).
+If you find any bugs, please [open an issue](https://github.com/aliahadmd/TimeManager/issues).
 
 ---
 

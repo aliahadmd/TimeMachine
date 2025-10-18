@@ -14,7 +14,7 @@ git commit -m "Initial commit - Pomodoro Timer v1.0.0"
 
 # 2. Create GitHub repository (do this on GitHub.com first)
 # Then link it:
-git remote add origin https://github.com/YOUR_USERNAME/TimeManager.git
+git remote add origin https://github.com/aliahadmd/TimeManager.git
 git branch -M main
 git push -u origin main
 
@@ -63,8 +63,8 @@ git commit -m "Initial commit - Pomodoro Timer v1.0.0
 - Dark/light mode support
 - Material 3 design"
 
-# Add remote (replace YOUR_USERNAME with your GitHub username)
-git remote add origin https://github.com/YOUR_USERNAME/TimeManager.git
+# Add remote (replace aliahadmd with your GitHub username)
+git remote add origin https://github.com/aliahadmd/TimeManager.git
 
 # Rename branch to main
 git branch -M main
@@ -85,7 +85,7 @@ git push origin v1.0.0
 
 ### Step 4: Create GitHub Release
 
-1. Go to your repository: `https://github.com/YOUR_USERNAME/TimeManager`
+1. Go to your repository: `https://github.com/aliahadmd/TimeManager`
 2. Click **Releases** (right sidebar)
 3. Click **Draft a new release**
 4. Fill in:
@@ -105,7 +105,7 @@ After publishing, share your download link:
 
 ```
 📱 Download Pomodoro Timer:
-https://github.com/YOUR_USERNAME/TimeManager/releases/latest
+https://github.com/aliahadmd/TimeManager/releases/latest
 ```
 
 People can click → Download APK → Install!
@@ -161,7 +161,7 @@ git push origin main --tags
 git remote -v
 
 # If wrong, update it
-git remote set-url origin https://github.com/YOUR_USERNAME/TimeManager.git
+git remote set-url origin https://github.com/aliahadmd/TimeManager.git
 ```
 
 ### Problem: "Failed to push tag"
@@ -231,7 +231,7 @@ Pomodoro Timer - A minimal, beautiful timer app built with Jetpack Compose
 • Dark/light mode
 • 100% free & open source
 
-📥 Download: https://github.com/YOUR_USERNAME/TimeManager/releases
+📥 Download: https://github.com/aliahadmd/TimeManager/releases
 
 Built with ❤️ using Kotlin and Compose
 #AndroidDev #Kotlin #JetpackCompose
