@@ -22,6 +22,9 @@ class TimerService : Service() {
     private val _remainingSeconds = MutableStateFlow(0)
     val remainingSeconds: StateFlow<Int> = _remainingSeconds
     
+    private val _totalSeconds = MutableStateFlow(0)
+    val totalSeconds: StateFlow<Int> = _totalSeconds
+    
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning
     
@@ -62,16 +65,18 @@ class TimerService : Service() {
     private fun restoreTimerIfNeeded() {
         val prefs = getSharedPreferences("timer_prefs", Context.MODE_PRIVATE)
         val endTimeMillis = prefs.getLong("timer_end_time", 0)
+        val timerDuration = prefs.getInt("timer_duration", 0)
         
         if (endTimeMillis > 0) {
             val now = System.currentTimeMillis()
             val remainingSeconds = ((endTimeMillis - now) / 1000).toInt()
             
-            android.util.Log.d("TimerService", "🔄 Restoring timer: $remainingSeconds seconds remaining")
+            android.util.Log.d("TimerService", "🔄 Restoring timer: $remainingSeconds seconds remaining (total: $timerDuration)")
             
             if (remainingSeconds > 0) {
                 // Timer still running - restore it
                 _remainingSeconds.value = remainingSeconds
+                _totalSeconds.value = timerDuration
                 _isRunning.value = true
                 
                 // Restart foreground service and countdown
@@ -118,63 +123,6 @@ class TimerService : Service() {
         return START_STICKY  // Changed to START_STICKY so service restarts if killed
     }
     
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        super.onTaskRemoved(rootIntent)
-        
-        android.util.Log.d("TimerService", "🔴 onTaskRemoved called! Timer running: ${_isRunning.value}")
-        
-        // Only show notification if timer is actually running
-        if (_isRunning.value) {
-            android.util.Log.d("TimerService", "📱 Showing task removed notification...")
-            showTaskRemovedNotification()
-        }
-        
-        // Keep service running - don't restart, just keep current foreground service
-        // No need to restart intent, service is already running as foreground
-    }
-    
-    private fun showTaskRemovedNotification() {
-        try {
-            android.util.Log.d("TimerService", "🔔 Creating task removed notification...")
-            
-            val openIntent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            
-            val pendingIntent = PendingIntent.getActivity(
-                this,
-                999, // Different request code
-                openIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            
-            // Use ALARM channel for higher priority (user will definitely see it)
-            val notification = NotificationCompat.Builder(this, ALARM_CHANNEL_ID)
-                .setContentTitle("⏰ Timer still running!")
-                .setContentText("Don't worry! Your timer is still counting. Tap to reopen.")
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setAutoCancel(true)
-                .setOngoing(false)
-                .setContentIntent(pendingIntent)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setVibrate(longArrayOf(0, 200, 100, 200)) // Short vibration pattern
-                .build()
-            
-            notificationManager?.notify(TASK_REMOVED_NOTIFICATION_ID, notification)
-            android.util.Log.d("TimerService", "✅ Task removed notification shown!")
-            
-            // Auto-dismiss after 8 seconds (give user time to see it)
-            serviceScope.launch {
-                delay(8000)
-                notificationManager?.cancel(TASK_REMOVED_NOTIFICATION_ID)
-                android.util.Log.d("TimerService", "🗑️ Task removed notification auto-dismissed")
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("TimerService", "❌ Error showing task removed notification: ${e.message}")
-        }
-    }
     
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -227,6 +175,7 @@ class TimerService : Service() {
         if (_isRunning.value) return
         
         _remainingSeconds.value = durationSeconds
+        _totalSeconds.value = durationSeconds
         _isRunning.value = true
         
         // Persist timer data for recovery

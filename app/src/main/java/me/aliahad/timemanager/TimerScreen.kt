@@ -65,6 +65,33 @@ fun TimerScreen(
     var timerService by remember { mutableStateOf<TimerService?>(null) }
     var serviceBound by remember { mutableStateOf(false) }
     
+    // Service state - use mutableStateOf and update via LaunchedEffect
+    var isRunning by remember { mutableStateOf(false) }
+    var remainingSeconds by remember { mutableIntStateOf(0) }
+    var serviceAlarmRinging by remember { mutableStateOf(false) }
+    
+    // Update states when service connects or changes
+    LaunchedEffect(timerService) {
+        timerService?.let { service ->
+            launch {
+                service.isRunning.collect { isRunning = it }
+            }
+            launch {
+                service.remainingSeconds.collect { remainingSeconds = it }
+            }
+            launch {
+                service.totalSeconds.collect { serviceTotalSeconds ->
+                    if (serviceTotalSeconds > 0) {
+                        totalSeconds = serviceTotalSeconds
+                    }
+                }
+            }
+            launch {
+                service.isAlarmRinging.collect { serviceAlarmRinging = it }
+            }
+        }
+    }
+    
     val serviceConnection = remember {
         object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -79,11 +106,6 @@ fun TimerScreen(
             }
         }
     }
-    
-    // Observe service state
-    val isRunning by timerService?.isRunning?.collectAsState() ?: remember { mutableStateOf(false) }
-    val remainingSeconds by timerService?.remainingSeconds?.collectAsState() ?: remember { mutableIntStateOf(0) }
-    val serviceAlarmRinging by timerService?.isAlarmRinging?.collectAsState() ?: remember { mutableStateOf(false) }
     
     // Sync local alarm state with service state
     LaunchedEffect(serviceAlarmRinging) {
