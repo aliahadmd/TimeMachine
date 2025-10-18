@@ -24,8 +24,8 @@ android {
         applicationId = "me.aliahad.timemanager"
         minSdk = 31
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
@@ -67,6 +67,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons)
+    
+    // Navigation Compose
+    implementation(libs.androidx.navigation.compose)
     
     // Room for database
     implementation(libs.androidx.room.runtime)

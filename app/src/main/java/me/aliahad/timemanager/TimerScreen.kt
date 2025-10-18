@@ -1,9 +1,11 @@
 package me.aliahad.timemanager
 
-import android.content.Context
+import android.app.Activity
+import android.content.*
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.os.IBinder
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.compose.animation.AnimatedContent
@@ -34,14 +36,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.aliahad.timemanager.data.Preset
 import me.aliahad.timemanager.data.PresetRepository
 import me.aliahad.timemanager.data.TimerDatabase
+import me.aliahad.timemanager.permissions.ExactAlarmPermissionManager
 
 @Composable
-fun TimerScreen() {
+fun TimerScreen(
+    onBackPress: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     val database = remember { TimerDatabase.getDatabase(context) }
     val repository = remember { PresetRepository(database.presetDao()) }
@@ -49,30 +53,75 @@ fun TimerScreen() {
     
     var hours by remember { mutableIntStateOf(0) }
     var minutes by remember { mutableIntStateOf(25) }
-    var isRunning by remember { mutableStateOf(false) }
     var isAlarmRinging by remember { mutableStateOf(false) }
     var totalSeconds by remember { mutableIntStateOf(0) }
-    var remainingSeconds by remember { mutableIntStateOf(0) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var vibrator by remember { mutableStateOf<Vibrator?>(null) }
-    var showPresets by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
+    var showExactAlarmDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-
-    LaunchedEffect(isRunning) {
-        if (isRunning && remainingSeconds > 0) {
-            while (remainingSeconds > 0 && isRunning) {
-                delay(1000)
-                remainingSeconds--
+    
+    // Service binding
+    var timerService by remember { mutableStateOf<TimerService?>(null) }
+    var serviceBound by remember { mutableStateOf(false) }
+    
+    val serviceConnection = remember {
+        object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                val binder = service as TimerService.TimerBinder
+                timerService = binder.getService()
+                serviceBound = true
             }
-            if (remainingSeconds == 0 && isRunning) {
-                // Timer finished - play alarm and vibrate
+            
+            override fun onServiceDisconnected(name: ComponentName?) {
+                timerService = null
+                serviceBound = false
+            }
+        }
+    }
+    
+    // Observe service state
+    val isRunning by timerService?.isRunning?.collectAsState() ?: remember { mutableStateOf(false) }
+    val remainingSeconds by timerService?.remainingSeconds?.collectAsState() ?: remember { mutableIntStateOf(0) }
+    val serviceAlarmRinging by timerService?.isAlarmRinging?.collectAsState() ?: remember { mutableStateOf(false) }
+    
+    // Sync local alarm state with service state
+    LaunchedEffect(serviceAlarmRinging) {
+        if (serviceAlarmRinging && !isAlarmRinging) {
+            isAlarmRinging = true
+        }
+    }
+    
+    // Timer completion receiver
+    val timerCompleteReceiver = remember {
+        object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
                 isAlarmRinging = true
-                isRunning = false
-                vibrator = playAlarmAndVibrate(context)
+                vibrator = playAlarmAndVibrate(context!!)
                 mediaPlayer = createMediaPlayer(context)
                 mediaPlayer?.start()
             }
+        }
+    }
+    
+    DisposableEffect(Unit) {
+        // Bind to service
+        val intent = Intent(context, TimerService::class.java)
+        context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        
+        // Register broadcast receiver
+        val filter = IntentFilter("me.aliahad.timemanager.TIMER_COMPLETE")
+        context.registerReceiver(timerCompleteReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        
+        onDispose {
+            context.unbindService(serviceConnection)
+            try {
+                context.unregisterReceiver(timerCompleteReceiver)
+            } catch (e: Exception) {
+                // Receiver might not be registered
+            }
+            mediaPlayer?.release()
+            vibrator?.cancel()
         }
     }
 
@@ -93,11 +142,21 @@ fun TimerScreen() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Empty spacer for symmetry
-                Spacer(modifier = Modifier.width(48.dp))
+                // Back button if navigation is available
+                if (onBackPress != null) {
+                    IconButton(onClick = onBackPress) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.width(48.dp))
+                }
                 
                 Text(
-                    text = "Timer",
+                    text = "Focus Timer",
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold
                     ),
@@ -131,12 +190,19 @@ fun TimerScreen() {
                             hours = preset.hours
                             minutes = preset.minutes
                             
-                            // Start the timer immediately
+                            // Start the timer immediately via service
                             val total = preset.hours * 3600 + preset.minutes * 60
                             if (total > 0) {
-                                totalSeconds = total
-                                remainingSeconds = total
-                                isRunning = true
+                                if (ExactAlarmPermissionManager.needsExactAlarm(context)) {
+                                    showExactAlarmDialog = true
+                                } else {
+                                    totalSeconds = total
+                                    val intent = Intent(context, TimerService::class.java).apply {
+                                        action = TimerService.ACTION_START_TIMER
+                                        putExtra(TimerService.EXTRA_DURATION_SECONDS, total)
+                                    }
+                                    context.startForegroundService(intent)
+                                }
                             }
                         }
                     },
@@ -205,6 +271,12 @@ fun TimerScreen() {
                                 mediaPlayer = null
                                 vibrator?.cancel()
                                 vibrator = null
+                                
+                                // Dismiss alarm from service too
+                                val intent = Intent(context, TimerService::class.java).apply {
+                                    action = TimerService.ACTION_DISMISS_ALARM
+                                }
+                                context.startService(intent)
                             },
                             modifier = Modifier
                                 .height(56.dp)
@@ -227,8 +299,10 @@ fun TimerScreen() {
                         // Stop button
                         Button(
                             onClick = {
-                                isRunning = false
-                                remainingSeconds = 0
+                                val intent = Intent(context, TimerService::class.java).apply {
+                                    action = TimerService.ACTION_STOP_TIMER
+                                }
+                                context.startService(intent)
                             },
                             modifier = Modifier
                                 .size(90.dp),
@@ -252,9 +326,16 @@ fun TimerScreen() {
                             onClick = {
                                 val total = hours * 3600 + minutes * 60
                                 if (total > 0) {
-                                    totalSeconds = total
-                                    remainingSeconds = total
-                                    isRunning = true
+                                    if (ExactAlarmPermissionManager.needsExactAlarm(context)) {
+                                        showExactAlarmDialog = true
+                                    } else {
+                                        totalSeconds = total
+                                        val intent = Intent(context, TimerService::class.java).apply {
+                                            action = TimerService.ACTION_START_TIMER
+                                            putExtra(TimerService.EXTRA_DURATION_SECONDS, total)
+                                        }
+                                        context.startForegroundService(intent)
+                                    }
                                 }
                             },
                             modifier = Modifier
@@ -281,13 +362,6 @@ fun TimerScreen() {
         }
     }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            mediaPlayer?.release()
-            vibrator?.cancel()
-        }
-    }
-    
     // Save Preset Dialog
     if (showSaveDialog) {
         SavePresetDialog(
@@ -304,6 +378,35 @@ fun TimerScreen() {
                         )
                     )
                     showSaveDialog = false
+                }
+            }
+        )
+    }
+
+    if (showExactAlarmDialog && ExactAlarmPermissionManager.needsExactAlarm(context)) {
+        val activity = context as? Activity
+        ExactAlarmPermissionDialog(
+            showBatteryHelp = activity?.let { !ExactAlarmPermissionManager.hasBatteryException(it) } ?: false,
+            onDismiss = {
+                showExactAlarmDialog = false
+                val prefs = context.getSharedPreferences("notification_setup", Context.MODE_PRIVATE)
+                prefs.edit().putBoolean("has_seen_exact_alarm_dialog", true).apply()
+            },
+            onOpenExactAlarmSettings = {
+                val prefs = context.getSharedPreferences("notification_setup", Context.MODE_PRIVATE)
+                prefs.edit().putBoolean("has_seen_exact_alarm_dialog", true).apply()
+                if (activity != null) {
+                    ExactAlarmPermissionManager.openExactAlarmSettings(activity)
+                } else {
+                    NotificationSettingsHelper.openNotificationSettings(context)
+                }
+                showExactAlarmDialog = false
+            },
+            onOpenBatterySettings = {
+                if (activity != null) {
+                    ExactAlarmPermissionManager.requestBatteryException(activity)
+                } else {
+                    NotificationSettingsHelper.openNotificationSettings(context)
                 }
             }
         )
@@ -769,4 +872,3 @@ fun SavePresetDialog(
         }
     )
 }
-

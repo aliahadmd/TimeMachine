@@ -26,9 +26,11 @@ Perfect for focus sessions, breaks, meditation, cooking, Focus Timer technique, 
 ### 🎯 Core Functionality
 - **⏰ Custom Duration** - Set any duration from 1 minute to 23 hours 59 minutes
 - **⏱️ Real-Time Countdown** - Watch the timer count down with visual progress indicator
+- **📱 Background Service** - Timer continues running even when app is closed
+- **🔔 Persistent Notification** - Always-visible countdown in status bar and notification shade
 - **🔔 Alarm Sound** - System alarm plays when timer completes
 - **📳 Vibration** - Physical feedback with repeating vibration pattern
-- **🛑 Stop Anytime** - Cancel the timer whenever needed
+- **🛑 Stop Anytime** - Cancel the timer from app or notification
 
 ### 🎨 User Experience
 - **Apple-Style Picker** - Smooth, scrollable wheels for time selection (just like iOS)
@@ -47,7 +49,9 @@ Perfect for focus sessions, breaks, meditation, cooking, Focus Timer technique, 
 - **Lightweight** - Only 11MB APK size
 - **No Ads** - Completely ad-free experience
 - **No Internet Required** - Works 100% offline
-- **Battery Efficient** - Optimized background timer
+- **Battery Efficient** - Optimized foreground service for background operation
+- **Reliable** - Timer runs even when app is closed or phone is locked
+- **Real-time Updates** - Notification updates every second with remaining time
 - **ProGuard Optimized** - Minified and shrunk for performance
 
 ---
@@ -71,13 +75,22 @@ Perfect for focus sessions, breaks, meditation, cooking, Focus Timer technique, 
 
 ### Setting a Timer
 
-1. **Open the app** - Launch Focus Timer Timer
+1. **Open the app** - Launch TimeMachine
 2. **Set duration** - Scroll the time wheels to select hours and minutes
-   - Default is 25 minutes (perfect for Focus Timer technique)
+   - Default is 25 minutes (perfect for focus sessions)
 3. **Tap Start** - Big blue button starts the countdown
-4. **Watch progress** - Circular indicator shows time remaining
-5. **Get notified** - Alarm sound + vibration when complete
-6. **Dismiss** - Tap to stop the alarm
+4. **Background mode** - Notification appears with countdown
+5. **Close app** (optional) - Timer continues running in background
+6. **Get notified** - Alarm sound + vibration when complete (even if app is closed)
+7. **Dismiss** - Tap to stop the alarm
+
+### Background Operation
+
+- **Persistent notification** - Shows remaining time in status bar
+- **Stop from notification** - Use "Stop" button without opening app
+- **Tap to return** - Tap notification to see full timer
+- **Survives closure** - Timer runs even if you force-close the app
+- **Lock screen safe** - Continues running when screen is locked
 
 ### Focus Timer Technique
 
