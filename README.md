@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Focus Timer Timer](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![TimeMachine](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![Android](https://img.shields.io/badge/platform-Android-green.svg)
 ![Min API](https://img.shields.io/badge/API-31%2B-brightgreen.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-purple.svg)

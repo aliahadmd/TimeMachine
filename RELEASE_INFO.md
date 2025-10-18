@@ -2,7 +2,7 @@
 
 ## 📱 App Information
 
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Package Name:** me.aliahad.timemanager  
 **Minimum Android Version:** Android 12 (API 31)  
 **Target Android Version:** Android 15 (API 36)  
@@ -14,7 +14,7 @@
 
 ### Release APK Location
 ```
-TimeMachine-v1.0.0.apk
+TimeMachine-v1.1.0.apk
 ```
 
 ### How to Install
