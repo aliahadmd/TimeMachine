@@ -1,8 +1,8 @@
-# 🎉 Pomodoro Timer v1.0.0 - Initial Release
+# 🎉 TimeMachine v1.0.0 - Initial Release
 
 **Release Date**: October 18, 2025
 
-Welcome to the first release of Pomodoro Timer! A beautiful, minimal timer app for Android.
+Welcome to the first release of TimeMachine! A beautiful, minimal timer app for Android.
 
 ---
 
@@ -58,7 +58,7 @@ Welcome to the first release of Pomodoro Timer! A beautiful, minimal timer app f
 
 ## 📥 Installation
 
-1. Download `PomodoroTimer-v1.0.0.apk` attached below
+1. Download `TimeMachine-v1.0.0.apk` attached below
 2. On your Android device, go to **Settings → Security**
 3. Enable **Install from Unknown Sources** for your file manager/browser
 4. Open the downloaded APK file
@@ -79,7 +79,7 @@ Welcome to the first release of Pomodoro Timer! A beautiful, minimal timer app f
 ## 🚀 How to Use
 
 ### First Time Setup
-1. **Launch** the Pomodoro Timer app
+1. **Launch** the TimeMachine app
 2. You'll see the time picker with hours and minutes
 3. Default is set to **25 minutes** (standard Pomodoro)
 
@@ -133,7 +133,7 @@ Welcome to the first release of Pomodoro Timer! A beautiful, minimal timer app f
 
 None at launch! 🎉
 
-If you find any bugs, please report them in the [Issues](https://github.com/aliahadmd/TimeManager/issues) section.
+If you find any bugs, please report them in the [Issues](https://github.com/aliahadmd/TimeMachine/issues) section.
 
 ---
 
@@ -165,10 +165,10 @@ The app requests these permissions:
 
 We'd love to hear from you!
 
-- 🐛 **Report Bugs**: [Open an issue](https://github.com/aliahadmd/TimeManager/issues)
-- 💡 **Request Features**: [Submit an idea](https://github.com/aliahadmd/TimeManager/issues)
+- 🐛 **Report Bugs**: [Open an issue](https://github.com/aliahadmd/TimeMachine/issues)
+- 💡 **Request Features**: [Submit an idea](https://github.com/aliahadmd/TimeMachine/issues)
 - ⭐ **Star the Repo**: Show your support on GitHub
-- 📢 **Share**: Tell your friends about Pomodoro Timer
+- 📢 **Share**: Tell your friends about TimeMachine
 
 ---
 
@@ -187,7 +187,7 @@ Future updates may include:
 
 ## 🙏 Thank You
 
-Thank you for trying Pomodoro Timer v1.0.0! This is just the beginning.
+Thank you for trying TimeMachine v1.0.0! This is just the beginning.
 
 If you find this app useful, please:
 - ⭐ **Star** the repository
@@ -198,10 +198,10 @@ If you find this app useful, please:
 
 ## 🔗 Links
 
-- **GitHub Repository**: https://github.com/aliahadmd/TimeManager
+- **GitHub Repository**: https://github.com/aliahadmd/TimeMachine
 - **Download APK**: [See attachments below]
-- **Documentation**: [README.md](https://github.com/aliahadmd/TimeManager/blob/main/README.md)
-- **Report Issues**: [Issue Tracker](https://github.com/aliahadmd/TimeManager/issues)
+- **Documentation**: [README.md](https://github.com/aliahadmd/TimeMachine/blob/main/README.md)
+- **Report Issues**: [Issue Tracker](https://github.com/aliahadmd/TimeMachine/issues)
 - **Developer**: Ali Ahad (aliahad.me)
 
 ---

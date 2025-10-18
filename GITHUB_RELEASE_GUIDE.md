@@ -1,6 +1,6 @@
 # 📦 GitHub Release Publishing Guide
 
-Complete step-by-step guide to publish your Pomodoro Timer app releases on GitHub.
+Complete step-by-step guide to publish your TimeMachine app releases on GitHub.
 
 ---
 
@@ -63,10 +63,10 @@ cd /Volumes/essd/TimeManager
 ./gradlew assembleRelease
 
 # Copy and rename APK
-cp app/build/outputs/apk/release/app-release.apk PomodoroTimer-v1.0.1.apk
+cp app/build/outputs/apk/release/app-release.apk TimeMachine-v1.0.1.apk
 
 # Verify APK was created
-ls -lh PomodoroTimer-v1.0.1.apk
+ls -lh TimeMachine-v1.0.1.apk
 ```
 
 ---
@@ -77,11 +77,11 @@ ls -lh PomodoroTimer-v1.0.1.apk
 
 ```bash
 # Install on connected device/emulator
-adb install -r PomodoroTimer-v1.0.1.apk
+adb install -r TimeMachine-v1.0.1.apk
 
 # Or if previous version exists
 adb uninstall me.aliahad.timemanager
-adb install PomodoroTimer-v1.0.1.apk
+adb install TimeMachine-v1.0.1.apk
 
 # Launch app
 adb shell am start -n me.aliahad.timemanager/.MainActivity
@@ -135,11 +135,11 @@ git push origin v1.0.1
 #### Option A: Using GitHub Web Interface
 
 1. **Navigate to Repository**
-   - Go to `https://github.com/aliahadmd/TimeManager`
+   - Go to `https://github.com/aliahadmd/TimeMachine`
 
 2. **Access Releases**
    - Click "Releases" (right sidebar)
-   - Or go to `https://github.com/aliahadmd/TimeManager/releases`
+   - Or go to `https://github.com/aliahadmd/TimeMachine/releases`
 
 3. **Draft New Release**
    - Click "Draft a new release" button
@@ -155,7 +155,7 @@ git push origin v1.0.1
 6. **Release Notes** (see template below)
 
 7. **Attach APK**
-   - Drag and drop `PomodoroTimer-v1.0.1.apk` to the attachments area
+   - Drag and drop `TimeMachine-v1.0.1.apk` to the attachments area
    - Or click "Attach binaries by dropping them here or selecting them"
 
 8. **Preview & Publish**
@@ -171,7 +171,7 @@ git push origin v1.0.1
 
 # Create release with APK
 gh release create v1.0.1 \
-  PomodoroTimer-v1.0.1.apk \
+  TimeMachine-v1.0.1.apk \
   --title "v1.0.1 - Timer Improvements" \
   --notes-file RELEASE_NOTES.md
 ```
@@ -210,7 +210,7 @@ Create `RELEASE_NOTES.md` for each version:
 
 ## 📥 Installation
 
-1. Download `PomodoroTimer-v1.0.1.apk` below
+1. Download `TimeMachine-v1.0.1.apk` below
 2. Enable "Install from Unknown Sources" in Settings
 3. Open and install the APK
 
@@ -220,9 +220,9 @@ Create `RELEASE_NOTES.md` for each version:
 
 ## 🔗 Links
 
-- **Full Changelog**: https://github.com/aliahadmd/TimeManager/compare/v1.0.0...v1.0.1
-- **Documentation**: [README.md](https://github.com/aliahadmd/TimeManager/blob/main/README.md)
-- **Report Issues**: [Issue Tracker](https://github.com/aliahadmd/TimeManager/issues)
+- **Full Changelog**: https://github.com/aliahadmd/TimeMachine/compare/v1.0.0...v1.0.1
+- **Documentation**: [README.md](https://github.com/aliahadmd/TimeMachine/blob/main/README.md)
+- **Report Issues**: [Issue Tracker](https://github.com/aliahadmd/TimeMachine/issues)
 
 ---
 
@@ -234,7 +234,7 @@ If you find this app useful, please:
 - 💡 Suggest features
 - 📢 Share with friends
 
-Thank you for using Pomodoro Timer! 🙏
+Thank you for using TimeMachine! 🙏
 ```
 
 ---
@@ -390,13 +390,13 @@ For your very first release (v1.0.0):
 git status
 
 # 2. Create first tag
-git tag -a v1.0.0 -m "Initial release - Pomodoro Timer v1.0.0"
+git tag -a v1.0.0 -m "Initial release - TimeMachine v1.0.0"
 
 # 3. Push tag
 git push origin v1.0.0
 
 # 4. Copy APK to root with proper name
-cp app/build/outputs/apk/release/app-release.apk PomodoroTimer-v1.0.0.apk
+cp app/build/outputs/apk/release/app-release.apk TimeMachine-v1.0.0.apk
 
 # 5. Create GitHub release (follow Step 5 above)
 ```

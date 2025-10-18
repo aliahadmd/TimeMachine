@@ -1,17 +1,17 @@
-# ⏱️ Pomodoro Timer
+# ⏱️ TimeMachine
 
 <div align="center">
 
-![Pomodoro Timer](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Focus Timer Timer](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Android](https://img.shields.io/badge/platform-Android-green.svg)
 ![Min API](https://img.shields.io/badge/API-31%2B-brightgreen.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-purple.svg)
 
 **A beautiful, minimal timer app for Android built with Jetpack Compose**
 
-Perfect for Pomodoro technique, focus sessions, breaks, meditation, cooking, and more!
+Perfect for focus sessions, breaks, meditation, cooking, Focus Timer technique, and more!
 
-[Download APK](https://github.com/aliahadmd/TimeManager/releases/latest) • [Report Bug](https://github.com/aliahadmd/TimeManager/issues) • [Request Feature](https://github.com/aliahadmd/TimeManager/issues)
+[Download APK](https://github.com/aliahadmd/TimeMachine/releases/latest) • [Report Bug](https://github.com/aliahadmd/TimeMachine/issues) • [Request Feature](https://github.com/aliahadmd/TimeMachine/issues)
 
 </div>
 
@@ -55,8 +55,8 @@ Perfect for Pomodoro technique, focus sessions, breaks, meditation, cooking, and
 ## 📥 Installation
 
 ### Download APK
-1. Go to [Releases](https://github.com/aliahadmd/TimeManager/releases/latest)
-2. Download `PomodoroTimer-v1.0.0.apk`
+1. Go to [Releases](https://github.com/aliahadmd/TimeMachine/releases/latest)
+2. Download `TimeMachine-v1.0.0.apk`
 3. Enable "Install from Unknown Sources" in your Android settings
 4. Open the APK and install
 
@@ -71,17 +71,17 @@ Perfect for Pomodoro technique, focus sessions, breaks, meditation, cooking, and
 
 ### Setting a Timer
 
-1. **Open the app** - Launch Pomodoro Timer
+1. **Open the app** - Launch Focus Timer Timer
 2. **Set duration** - Scroll the time wheels to select hours and minutes
-   - Default is 25 minutes (perfect for Pomodoro technique)
+   - Default is 25 minutes (perfect for Focus Timer technique)
 3. **Tap Start** - Big blue button starts the countdown
 4. **Watch progress** - Circular indicator shows time remaining
 5. **Get notified** - Alarm sound + vibration when complete
 6. **Dismiss** - Tap to stop the alarm
 
-### Pomodoro Technique
+### Focus Timer Technique
 
-The classic Pomodoro technique:
+The classic Focus Timer technique:
 1. **Work**: Set timer for 25 minutes and focus
 2. **Short break**: Set timer for 5 minutes and rest
 3. **Repeat**: After 4 pomodoros, take a longer 15-30 minute break
@@ -109,7 +109,7 @@ The classic Pomodoro technique:
 
 ```bash
 # Clone the repository
-git clone https://github.com/aliahadmd/TimeManager.git
+git clone https://github.com/aliahadmd/TimeMachine.git
 cd TimeManager
 
 # Build debug APK
@@ -181,7 +181,7 @@ TimeManager/
 2. **Build Release APK**:
    ```bash
    ./gradlew assembleRelease
-   cp app/build/outputs/apk/release/app-release.apk PomodoroTimer-v1.0.1.apk
+   cp app/build/outputs/apk/release/app-release.apk Focus TimerTimer-v1.0.1.apk
    ```
 
 3. **Commit Changes**:
@@ -198,7 +198,7 @@ TimeManager/
    - Choose tag: `v1.0.1`
    - Release title: `v1.0.1 - [Brief description]`
    - Add release notes (see template below)
-   - Attach `PomodoroTimer-v1.0.1.apk`
+   - Attach `Focus TimerTimer-v1.0.1.apk`
    - Click "Publish release"
 
 ### Release Notes Template
@@ -215,11 +215,11 @@ TimeManager/
 - Improvement description here
 
 ### 📥 Installation
-Download `PomodoroTimer-v1.0.1.apk` below and install on your Android device.
+Download `Focus TimerTimer-v1.0.1.apk` below and install on your Android device.
 
 **Minimum Android Version**: Android 12 (API 31)
 
-**Full Changelog**: https://github.com/aliahadmd/TimeManager/compare/v1.0.0...v1.0.1
+**Full Changelog**: https://github.com/aliahadmd/TimeMachine/compare/v1.0.0...v1.0.1
 ```
 
 ---
@@ -246,7 +246,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 None at the moment! 🎉
 
-If you find any bugs, please [open an issue](https://github.com/aliahadmd/TimeManager/issues).
+If you find any bugs, please [open an issue](https://github.com/aliahadmd/TimeMachine/issues).
 
 ---
 
@@ -276,7 +276,7 @@ Ideas for future versions:
 
 - Jetpack Compose team for the amazing framework
 - Material Design for the design guidelines
-- Pomodoro Technique by Francesco Cirillo
+- Focus Timer Technique by Francesco Cirillo
 
 ---
 

@@ -1,6 +1,6 @@
 # 🚀 Quick Start Guide - Publishing Your First GitHub Release
 
-This guide will help you publish your Pomodoro Timer app to GitHub in under 10 minutes!
+This guide will help you publish your TimeMachine app to GitHub in under 10 minutes!
 
 ---
 
@@ -10,11 +10,11 @@ This guide will help you publish your Pomodoro Timer app to GitHub in under 10 m
 # 1. Initialize Git (if not already done)
 git init
 git add .
-git commit -m "Initial commit - Pomodoro Timer v1.0.0"
+git commit -m "Initial commit - TimeMachine v1.0.0"
 
 # 2. Create GitHub repository (do this on GitHub.com first)
 # Then link it:
-git remote add origin https://github.com/aliahadmd/TimeManager.git
+git remote add origin https://github.com/aliahadmd/TimeMachine.git
 git branch -M main
 git push -u origin main
 
@@ -23,7 +23,7 @@ git tag -a v1.0.0 -m "Initial release v1.0.0"
 git push origin v1.0.0
 
 # 4. Your APK is ready at:
-# PomodoroTimer-v1.0.0.apk
+# TimeMachine-v1.0.0.apk
 ```
 
 Then go to GitHub → Releases → Draft new release → Upload APK → Publish!
@@ -55,7 +55,7 @@ git init
 git add .
 
 # First commit
-git commit -m "Initial commit - Pomodoro Timer v1.0.0
+git commit -m "Initial commit - TimeMachine v1.0.0
 
 - Production-ready timer app
 - Apple-style time picker
@@ -64,7 +64,7 @@ git commit -m "Initial commit - Pomodoro Timer v1.0.0
 - Material 3 design"
 
 # Add remote (replace aliahadmd with your GitHub username)
-git remote add origin https://github.com/aliahadmd/TimeManager.git
+git remote add origin https://github.com/aliahadmd/TimeMachine.git
 
 # Rename branch to main
 git branch -M main
@@ -85,14 +85,14 @@ git push origin v1.0.0
 
 ### Step 4: Create GitHub Release
 
-1. Go to your repository: `https://github.com/aliahadmd/TimeManager`
+1. Go to your repository: `https://github.com/aliahadmd/TimeMachine`
 2. Click **Releases** (right sidebar)
 3. Click **Draft a new release**
 4. Fill in:
    - **Choose a tag**: Select `v1.0.0`
    - **Release title**: `v1.0.0 - Initial Release`
    - **Description**: Copy content from `RELEASE_NOTES_v1.0.0.md`
-5. **Attach files**: Drag and drop `PomodoroTimer-v1.0.0.apk`
+5. **Attach files**: Drag and drop `TimeMachine-v1.0.0.apk`
 6. Click **Publish release**
 
 **Done!** 🎉 Your app is now publicly available!
@@ -104,8 +104,8 @@ git push origin v1.0.0
 After publishing, share your download link:
 
 ```
-📱 Download Pomodoro Timer:
-https://github.com/aliahadmd/TimeManager/releases/latest
+📱 Download TimeMachine:
+https://github.com/aliahadmd/TimeMachine/releases/latest
 ```
 
 People can click → Download APK → Install!
@@ -161,7 +161,7 @@ git push origin main --tags
 git remote -v
 
 # If wrong, update it
-git remote set-url origin https://github.com/aliahadmd/TimeManager.git
+git remote set-url origin https://github.com/aliahadmd/TimeMachine.git
 ```
 
 ### Problem: "Failed to push tag"
@@ -223,7 +223,7 @@ Example post:
 ```
 🎉 Just released my first Android app!
 
-Pomodoro Timer - A minimal, beautiful timer app built with Jetpack Compose
+TimeMachine - A minimal, beautiful timer app built with Jetpack Compose
 
 ✨ Features:
 • Apple-style time picker
@@ -231,7 +231,7 @@ Pomodoro Timer - A minimal, beautiful timer app built with Jetpack Compose
 • Dark/light mode
 • 100% free & open source
 
-📥 Download: https://github.com/aliahadmd/TimeManager/releases
+📥 Download: https://github.com/aliahadmd/TimeMachine/releases
 
 Built with ❤️ using Kotlin and Compose
 #AndroidDev #Kotlin #JetpackCompose
@@ -273,7 +273,7 @@ Before publishing your first release:
 - [ ] Code pushed to GitHub
 - [ ] Version tag created and pushed
 - [ ] Release notes written
-- [ ] APK file ready (PomodoroTimer-v1.0.0.apk)
+- [ ] APK file ready (TimeMachine-v1.0.0.apk)
 - [ ] GitHub release created
 - [ ] APK uploaded to release
 - [ ] Release published

@@ -1,4 +1,4 @@
-# Pomodoro Timer - Release Information
+# TimeMachine - Release Information
 
 ## 📱 App Information
 
@@ -14,7 +14,7 @@
 
 ### Release APK Location
 ```
-PomodoroTimer-v1.0.0.apk
+TimeMachine-v1.0.0.apk
 ```
 
 ### How to Install
@@ -26,14 +26,14 @@ PomodoroTimer-v1.0.0.apk
    - Select the file manager/browser you'll use to install
    - Enable "Allow from this source"
 3. **Install the APK:**
-   - Tap on `PomodoroTimer-v1.0.0.apk`
+   - Tap on `TimeMachine-v1.0.0.apk`
    - Tap "Install"
    - Wait for installation to complete
    - Tap "Open" or find the app in your app drawer
 
 #### Using ADB (Developer Method):
 ```bash
-adb install PomodoroTimer-v1.0.0.apk
+adb install TimeMachine-v1.0.0.apk
 ```
 
 ---

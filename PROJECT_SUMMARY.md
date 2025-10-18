@@ -1,4 +1,4 @@
-# 📦 Pomodoro Timer - Project Summary
+# 📦 TimeMachine - Project Summary
 
 Your app is **100% ready for GitHub release!** 🎉
 
@@ -7,7 +7,7 @@ Your app is **100% ready for GitHub release!** 🎉
 ## ✅ What's Been Created
 
 ### 📱 Production App
-- ✅ **Release APK**: `PomodoroTimer-v1.0.0.apk` (11MB)
+- ✅ **Release APK**: `TimeMachine-v1.0.0.apk` (11MB)
 - ✅ **App Icon**: Custom blue timer icon with circular design
 - ✅ **Signed**: Production keystore for distribution
 - ✅ **Optimized**: ProGuard enabled, resources shrunk
@@ -56,8 +56,8 @@ Your app is **100% ready for GitHub release!** 🎉
 # 1. Create repo on GitHub.com first, then:
 git init
 git add .
-git commit -m "Initial commit - Pomodoro Timer v1.0.0"
-git remote add origin https://github.com/aliahadmd/TimeManager.git
+git commit -m "Initial commit - TimeMachine v1.0.0"
+git remote add origin https://github.com/aliahadmd/TimeMachine.git
 git branch -M main
 git push -u origin main
 
@@ -66,7 +66,7 @@ git tag -a v1.0.0 -m "Initial release"
 git push origin v1.0.0
 
 # 3. Go to GitHub → Releases → Draft new release
-# 4. Upload PomodoroTimer-v1.0.0.apk
+# 4. Upload TimeMachine-v1.0.0.apk
 # 5. Copy content from RELEASE_NOTES_v1.0.0.md
 # 6. Click "Publish release"
 ```
@@ -84,7 +84,7 @@ Follow step-by-step instructions in:
 
 ```
 TimeManager/
-├── 📱 PomodoroTimer-v1.0.0.apk  ← Ready to distribute!
+├── 📱 TimeMachine-v1.0.0.apk  ← Ready to distribute!
 │
 ├── 📚 Documentation
 │   ├── README.md                ← Main project docs
@@ -165,7 +165,7 @@ Double-check before publishing:
 - [x] Version numbers correct (1.0.0)
 
 ### Files Ready
-- [x] PomodoroTimer-v1.0.0.apk exists
+- [x] TimeMachine-v1.0.0.apk exists
 - [x] Keystore backed up securely
 - [x] All documentation files created
 
@@ -187,8 +187,8 @@ Go to [github.com/new](https://github.com/new) and create `TimeManager` reposito
 cd /Volumes/essd/TimeManager
 git init
 git add .
-git commit -m "Initial commit - Pomodoro Timer v1.0.0"
-git remote add origin https://github.com/aliahadmd/TimeManager.git
+git commit -m "Initial commit - TimeMachine v1.0.0"
+git remote add origin https://github.com/aliahadmd/TimeMachine.git
 git branch -M main
 git push -u origin main
 ```
@@ -201,7 +201,7 @@ git push origin v1.0.0
 
 ### 4. Publish on GitHub
 - Go to repository → Releases → Draft new release
-- Upload `PomodoroTimer-v1.0.0.apk`
+- Upload `TimeMachine-v1.0.0.apk`
 - Copy release notes from `RELEASE_NOTES_v1.0.0.md`
 - Click "Publish"
 
@@ -213,7 +213,7 @@ After publishing, promote your app:
 
 ### Social Media
 ```
-🎉 Just released Pomodoro Timer v1.0.0!
+🎉 Just released TimeMachine v1.0.0!
 
 A beautiful, minimal timer app for Android
 ✨ Apple-style time picker
@@ -222,7 +222,7 @@ A beautiful, minimal timer app for Android
 🌓 Auto dark/light mode
 🆓 100% free & open source
 
-📥 Download: https://github.com/aliahadmd/TimeManager/releases
+📥 Download: https://github.com/aliahadmd/TimeMachine/releases
 
 #AndroidDev #Kotlin #JetpackCompose #OpenSource
 ```
