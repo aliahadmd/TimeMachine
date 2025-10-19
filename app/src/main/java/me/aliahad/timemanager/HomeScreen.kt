@@ -29,6 +29,9 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.activity.ComponentActivity
 import me.aliahad.timemanager.permissions.ExactAlarmPermissionManager
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 @Composable
 fun HomeScreen(
@@ -204,17 +207,34 @@ fun TimerBlockCard(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val database = remember { me.aliahad.timemanager.data.TimerDatabase.getDatabase(context) }
     
     // For Focus Timer, get today's tracked time
     var todayMinutes by remember { mutableIntStateOf(0) }
+    var refreshTrigger by remember { mutableIntStateOf(0) }
+    
+    // Listen for lifecycle events to refresh immediately when screen resumes
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshTrigger++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     
     if (block.type == TimerBlockType.FOCUS_TIMER) {
-        LaunchedEffect(Unit) {
+        LaunchedEffect(refreshTrigger) {
             while (true) {
                 val today = getTodayDateString()
-                todayMinutes = database.timeSessionDao().getTotalMinutesForDate(today) ?: 0
-                kotlinx.coroutines.delay(60000) // Update every minute
+                val minutes = database.timeSessionDao().getTotalMinutesForDate(today) ?: 0
+                android.util.Log.d("HomeScreen", "Fetching today's minutes for $today: $minutes min (refreshTrigger=$refreshTrigger)")
+                todayMinutes = minutes
+                kotlinx.coroutines.delay(5000) // Update every 5 seconds for more responsive UI
             }
         }
     }

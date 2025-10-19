@@ -34,6 +34,9 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 // Main Screen with Tabs
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,10 +94,26 @@ fun TimerScreen(onBackPress: () -> Unit) {
 fun TrackingTab(database: TimerDatabase) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
     val categories by database.activityCategoryDao().getAllActiveCategories().collectAsState(initial = emptyList())
     
     var selectedCategory by remember { mutableStateOf<ActivityCategory?>(null) }
     var refreshTrigger by remember { mutableIntStateOf(0) } // For forcing UI refresh
+    
+    // Listen for lifecycle events to refresh data when returning from ImmersiveTimerActivity
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                // Increment refresh trigger to force UI update
+                refreshTrigger++
+                android.util.Log.d("FocusTracker", "TrackingTab ON_RESUME - refreshTrigger now: $refreshTrigger")
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -130,13 +149,13 @@ fun TrackingTab(database: TimerDatabase) {
         
         item {
             key(refreshTrigger) {
-                TodaySummaryCard(database, selectedCategory)
+                TodaySummaryCard(database, selectedCategory, refreshTrigger)
             }
         }
         
         item {
             key(refreshTrigger) {
-                RecentSessionsCard(database)
+                RecentSessionsCard(database, refreshTrigger)
             }
         }
     }
@@ -358,7 +377,7 @@ fun StartTimerCard(
                     FeatureRow("🔒 Landscape mode locked")
                     FeatureRow("📱 System UI hidden")
                     FeatureRow("⏸️ Pause anytime")
-                    FeatureRow("💡 Auto-save on completion")
+                    FeatureRow("💾 Auto-saves after 30 seconds")
                 }
             }
         }
@@ -398,17 +417,19 @@ fun formatTimerDisplay(seconds: Int): String {
 }
 
 @Composable
-fun TodaySummaryCard(database: TimerDatabase, selectedCategory: ActivityCategory?) {
+fun TodaySummaryCard(database: TimerDatabase, selectedCategory: ActivityCategory?, refreshTrigger: Int) {
     val scope = rememberCoroutineScope()
     var todayTotal by remember { mutableIntStateOf(0) }
     var categoryToday by remember { mutableIntStateOf(0) }
     var sessionCount by remember { mutableIntStateOf(0) }
     
-    LaunchedEffect(selectedCategory) {
+    LaunchedEffect(selectedCategory, refreshTrigger) {
         scope.launch(Dispatchers.IO) {
             val today = getTodayDateString()
+            android.util.Log.d("FocusTracker", "TodaySummaryCard fetching data for $today (refreshTrigger=$refreshTrigger)")
             val total = database.timeSessionDao().getTotalMinutesForDate(today) ?: 0
             val count = database.timeSessionDao().getSessionCountForDate(today)
+            android.util.Log.d("FocusTracker", "TodaySummaryCard: Total=$total min, Count=$count sessions")
             
             withContext(Dispatchers.Main) {
                 todayTotal = total
@@ -419,6 +440,7 @@ fun TodaySummaryCard(database: TimerDatabase, selectedCategory: ActivityCategory
                 val sessions = database.timeSessionDao().getSessionsBetweenDatesSync(today, today)
                 val catTotal = sessions.filter { it.categoryId == selectedCategory.id }
                     .sumOf { it.durationMinutes }
+                android.util.Log.d("FocusTracker", "TodaySummaryCard: Category '${selectedCategory.name}' today=$catTotal min")
                 
                 withContext(Dispatchers.Main) {
                     categoryToday = catTotal
@@ -518,14 +540,16 @@ fun StatColumn(value: String, label: String, color: Color) {
 }
 
 @Composable
-fun RecentSessionsCard(database: TimerDatabase) {
+fun RecentSessionsCard(database: TimerDatabase, refreshTrigger: Int) {
     val scope = rememberCoroutineScope()
     var recentSessions by remember { mutableStateOf<List<Pair<TimeSession, ActivityCategory>>>(emptyList()) }
     
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshTrigger) {
         scope.launch(Dispatchers.IO) {
             val today = getTodayDateString()
+            android.util.Log.d("FocusTracker", "RecentSessionsCard fetching sessions for $today (refreshTrigger=$refreshTrigger)")
             val sessions = database.timeSessionDao().getSessionsBetweenDatesSync(today, today)
+            android.util.Log.d("FocusTracker", "RecentSessionsCard: Found ${sessions.size} sessions")
             val sessionsWithCategories = sessions.mapNotNull { session ->
                 val category = database.activityCategoryDao().getCategoryById(session.categoryId)
                 if (category != null) session to category else null
@@ -604,8 +628,23 @@ fun formatTime(timestamp: Long): String {
 @Composable
 fun StatsTab(database: TimerDatabase) {
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
     val categories by database.activityCategoryDao().getAllActiveCategories().collectAsState(initial = emptyList())
     var selectedCategoryForStats by remember { mutableStateOf<ActivityCategory?>(null) }
+    var refreshTrigger by remember { mutableIntStateOf(0) }
+    
+    // Listen for lifecycle events to refresh stats when returning to this tab
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshTrigger++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -622,11 +661,15 @@ fun StatsTab(database: TimerDatabase) {
         
         if (selectedCategoryForStats != null) {
             item {
-                CategoryStatsCard(database, selectedCategoryForStats!!)
+                key(refreshTrigger, selectedCategoryForStats!!.id) {
+                    CategoryStatsCard(database, selectedCategoryForStats!!)
+                }
             }
             
             item {
-                CalendarGoalView(database, selectedCategoryForStats!!)
+                key(refreshTrigger, selectedCategoryForStats!!.id) {
+                    CalendarGoalView(database, selectedCategoryForStats!!)
+                }
             }
         } else if (categories.isNotEmpty()) {
             item {

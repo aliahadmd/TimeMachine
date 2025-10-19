@@ -40,6 +40,8 @@ import me.aliahad.timemanager.data.TimeSession
 import me.aliahad.timemanager.ui.theme.TimeManagerTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.BackHandler
 
 /**
  * True Immersive Fullscreen Timer Activity
@@ -204,7 +206,6 @@ fun ImmersiveTimerScreen(
     var isRunning by remember { mutableStateOf(true) }
     var isPaused by remember { mutableStateOf(false) }
     var elapsedSeconds by remember { mutableIntStateOf(initialElapsedSeconds) }
-    var showExitConfirmation by remember { mutableStateOf(false) }
     var showControls by remember { mutableStateOf(false) }
     var showHintMessage by remember { mutableStateOf(false) }
     var lastTapTime by remember { mutableLongStateOf(0L) }
@@ -212,6 +213,63 @@ fun ImmersiveTimerScreen(
     // Daily goal tracking
     var categoryInfo by remember { mutableStateOf<me.aliahad.timemanager.data.ActivityCategory?>(null) }
     var todayCompletedMinutes by remember { mutableIntStateOf(0) }
+    
+    // Shared function to save session and exit
+    val saveSessionAndExit = remember {
+        { exitNow: Boolean ->
+            scope.launch {
+                val finalElapsedSeconds = elapsedSeconds
+                val finalCategoryId = categoryId
+                val finalSessionStart = sessionStart
+                
+                android.util.Log.d("ImmersiveTimer", "💾 Saving session before exit (elapsedSeconds=$finalElapsedSeconds)")
+                
+                // Save session if >= 30 seconds
+                if (finalElapsedSeconds >= 30) {
+                    try {
+                        val sessionId = withContext(Dispatchers.IO) {
+                            val todayDate = getTodayDateString()
+                            val durationMins = (finalElapsedSeconds / 60).coerceAtLeast(1)
+                            val session = TimeSession(
+                                categoryId = finalCategoryId,
+                                startTime = finalSessionStart,
+                                endTime = System.currentTimeMillis(),
+                                durationMinutes = durationMins,
+                                date = todayDate
+                            )
+                            android.util.Log.d("ImmersiveTimer", "Saving session: categoryId=$finalCategoryId, duration=${durationMins}min (${finalElapsedSeconds}s), date=$todayDate")
+                            val id = database.timeSessionDao().insertSession(session)
+                            android.util.Log.d("ImmersiveTimer", "Insert returned ID=$id")
+                            
+                            val totalToday = database.timeSessionDao().getTotalMinutesForDate(todayDate) ?: 0
+                            val sessionCount = database.timeSessionDao().getSessionCountForDate(todayDate)
+                            android.util.Log.d("ImmersiveTimer", "Verification: Total today=${totalToday}min, Count=$sessionCount sessions")
+                            id
+                        }
+                        android.util.Log.d("ImmersiveTimer", "✅ Session committed successfully (ID: $sessionId)")
+                    } catch (e: Exception) {
+                        android.util.Log.e("ImmersiveTimer", "❌ Error saving session", e)
+                        e.printStackTrace()
+                    }
+                } else {
+                    android.util.Log.d("ImmersiveTimer", "⚠️ Session too short (${finalElapsedSeconds}s < 30s), not saving")
+                }
+                
+                // Exit after ensuring save is complete
+                if (exitNow) {
+                    android.util.Log.d("ImmersiveTimer", "Exiting activity...")
+                    delay(300)
+                    onExit(finalElapsedSeconds, false)
+                }
+            }
+        }
+    }
+    
+    // Handle back press - save session and exit
+    BackHandler(enabled = true) {
+        android.util.Log.w("ImmersiveTimer", "⬅️ BACK GESTURE/BUTTON pressed - saving session!")
+        saveSessionAndExit(true)
+    }
     
     // Load category info and today's completed time
     LaunchedEffect(categoryId) {
@@ -337,27 +395,50 @@ fun ImmersiveTimerScreen(
                 textAlign = TextAlign.Center
             )
             
-            // Status text
+            // Status text and session save indicator
             AnimatedVisibility(
-                visible = showControls || isPaused,
+                visible = showControls || isPaused || elapsedSeconds < 30,
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
-                Text(
-                    when {
-                        isPaused -> "⏸ PAUSED"
-                        !isRunning -> "Session Ended"
-                        else -> formatImmersiveDuration(elapsedSeconds / 60)
-                    },
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = when {
-                        isPaused -> Color(0xFFFFA726)
-                        !isRunning -> Color(0xFF66BB6A)
-                        else -> Color.White.copy(alpha = 0.6f)
-                    },
-                    fontWeight = if (isPaused) FontWeight.Bold else FontWeight.Normal,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(top = 24.dp)
-                )
+                ) {
+                    Text(
+                        when {
+                            isPaused -> "⏸ PAUSED"
+                            !isRunning -> "Session Ended"
+                            else -> formatImmersiveDuration(elapsedSeconds / 60)
+                        },
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = when {
+                            isPaused -> Color(0xFFFFA726)
+                            !isRunning -> Color(0xFF66BB6A)
+                            else -> Color.White.copy(alpha = 0.6f)
+                        },
+                        fontWeight = if (isPaused) FontWeight.Bold else FontWeight.Normal
+                    )
+                    
+                    // Minimum session length indicator
+                    if (isRunning && !isPaused && elapsedSeconds < 30) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            "Keep going... ${30 - elapsedSeconds}s to save",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFFFFA726),
+                            fontWeight = FontWeight.Medium
+                        )
+                    } else if (isRunning && !isPaused && elapsedSeconds >= 30) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            "✓ Session will be saved",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF66BB6A),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
             
             // Daily Goal Progress Bar
@@ -494,9 +575,12 @@ fun ImmersiveTimerScreen(
                 horizontalArrangement = Arrangement.spacedBy(32.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Exit button
+                // Exit button (saves session and exits)
                 FloatingActionButton(
-                    onClick = { showExitConfirmation = true },
+                    onClick = { 
+                        android.util.Log.w("ImmersiveTimer", "❌ EXIT BUTTON pressed - saving session and exiting!")
+                        saveSessionAndExit(true)
+                    },
                     modifier = Modifier.size(72.dp),
                     containerColor = Color.White.copy(alpha = 0.1f),
                     contentColor = Color.White
@@ -526,35 +610,13 @@ fun ImmersiveTimerScreen(
                     )
                 }
                 
-                // Stop button
+                // Stop button (RED - saves session)
                 FloatingActionButton(
                     onClick = {
+                        android.util.Log.w("ImmersiveTimer", "🔴 STOP BUTTON pressed - saving session and exiting!")
                         isRunning = false
                         isPaused = false
-                        
-                        // Save session if >= 1 minute
-                        if (elapsedSeconds >= 60) {
-                            scope.launch(Dispatchers.IO) {
-                                try {
-                                    val session = TimeSession(
-                                        categoryId = categoryId,
-                                        startTime = sessionStart,
-                                        endTime = System.currentTimeMillis(),
-                                        durationMinutes = elapsedSeconds / 60,
-                                        date = getTodayDateString()
-                                    )
-                                    database.timeSessionDao().insertSession(session)
-                                } catch (e: Exception) {
-                                    android.util.Log.e("ImmersiveTimer", "Error saving session", e)
-                                }
-                            }
-                        }
-                        
-                        // Exit after brief delay
-                        scope.launch {
-                            delay(500)
-                            onExit(elapsedSeconds, false)
-                        }
+                        saveSessionAndExit(true)
                     },
                     modifier = Modifier.size(72.dp),
                     containerColor = Color(0xFFEF5350),
@@ -591,60 +653,6 @@ fun ImmersiveTimerScreen(
                 )
             }
         }
-    }
-    
-    // Exit confirmation dialog
-    if (showExitConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showExitConfirmation = false },
-            icon = {
-                Icon(
-                    Icons.Default.ExitToApp,
-                    contentDescription = null,
-                    tint = Color(0xFFFFA726),
-                    modifier = Modifier.size(48.dp)
-                )
-            },
-            title = {
-                Text(
-                    "Exit Focus Mode?",
-                    style = MaterialTheme.typography.headlineSmall
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        "Your timer is still running.",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "You can return anytime to continue.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onExit(elapsedSeconds, isRunning)
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFFA726)
-                    )
-                ) {
-                    Text("Exit")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showExitConfirmation = false }
-                ) {
-                    Text("Stay")
-                }
-            }
-        )
     }
 }
 
