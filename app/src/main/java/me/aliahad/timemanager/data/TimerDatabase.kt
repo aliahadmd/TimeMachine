@@ -6,14 +6,25 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [Preset::class, Habit::class, HabitCompletion::class, DateCalculation::class],
-    version = 4,
+    entities = [
+        Preset::class, 
+        Habit::class, 
+        HabitCompletion::class, 
+        DateCalculation::class, 
+        BMICalculation::class,
+        ActivityCategory::class,
+        TimeSession::class
+    ],
+    version = 6,
     exportSchema = false
 )
 abstract class TimerDatabase : RoomDatabase() {
     abstract fun presetDao(): PresetDao
     abstract fun habitDao(): HabitDao
     abstract fun dateCalculationDao(): DateCalculationDao
+    abstract fun bmiCalculationDao(): BMICalculationDao
+    abstract fun activityCategoryDao(): ActivityCategoryDao
+    abstract fun timeSessionDao(): TimeSessionDao
     
     companion object {
         @Volatile

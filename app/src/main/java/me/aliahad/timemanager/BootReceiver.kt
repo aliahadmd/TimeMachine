@@ -61,57 +61,12 @@ class BootReceiver : BroadcastReceiver() {
                         }
                     }
                     
-                    // 2. Restore timer if it was running
-                    restoreTimerIfNeeded(context)
+                    // Note: Old timer restore logic removed - new Focus Tracker uses database sessions
+                    Log.d("BootReceiver", "✅ Boot completed, habit reminders rescheduled")
                     
                 } catch (e: Exception) {
                     Log.e("BootReceiver", "❌ Error on boot: ${e.message}")
                 }
-            }
-        }
-    }
-    
-    private fun restoreTimerIfNeeded(context: Context) {
-        val prefs = context.getSharedPreferences("timer_prefs", Context.MODE_PRIVATE)
-        val endTimeMillis = prefs.getLong("timer_end_time", 0)
-        
-        if (endTimeMillis > 0) {
-            val now = System.currentTimeMillis()
-            val remainingSeconds = ((endTimeMillis - now) / 1000).toInt()
-            
-            Log.d("BootReceiver", "⏰ Found active timer: $remainingSeconds seconds remaining")
-            
-            if (remainingSeconds > 0) {
-                // Timer still running - reschedule fallback alarm
-                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
-                
-                val alarmIntent = Intent(context, TimerAlarmReceiver::class.java)
-                val pendingIntent = android.app.PendingIntent.getBroadcast(
-                    context,
-                    TimerService.FALLBACK_ALARM_REQUEST_CODE,
-                    alarmIntent,
-                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-                )
-                
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        android.app.AlarmManager.RTC_WAKEUP,
-                        endTimeMillis,
-                        pendingIntent
-                    )
-                } else {
-                    alarmManager.setExact(
-                        android.app.AlarmManager.RTC_WAKEUP,
-                        endTimeMillis,
-                        pendingIntent
-                    )
-                }
-                
-                Log.d("BootReceiver", "✅ Timer fallback alarm rescheduled")
-            } else {
-                // Timer already finished - clear data
-                prefs.edit().clear().apply()
-                Log.d("BootReceiver", "🗑️ Expired timer data cleared")
             }
         }
     }

@@ -1,10 +1,6 @@
 package me.aliahad.timemanager
 
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
-import android.os.IBinder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -39,8 +35,6 @@ fun HomeScreen(
     onBlockClick: (TimerBlockType) -> Unit
 ) {
     val context = LocalContext.current
-    var timerService by remember { mutableStateOf<TimerService?>(null) }
-    var serviceBound by remember { mutableStateOf(false) }
     var showNotificationDialog by remember { mutableStateOf(false) }
     var areNotificationsConfigured by remember { mutableStateOf(false) }
     var needsExactAlarmPermission by remember { mutableStateOf(false) }
@@ -90,33 +84,6 @@ fun HomeScreen(
         }
     }
     
-    // Service connection
-    val serviceConnection = remember {
-        object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                val binder = service as TimerService.TimerBinder
-                timerService = binder.getService()
-                serviceBound = true
-            }
-            
-            override fun onServiceDisconnected(name: ComponentName?) {
-                timerService = null
-                serviceBound = false
-            }
-        }
-    }
-    
-    // Bind to service
-    DisposableEffect(Unit) {
-        val intent = Intent(context, TimerService::class.java)
-        context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-        
-        onDispose {
-            if (serviceBound) {
-                context.unbindService(serviceConnection)
-            }
-        }
-    }
     
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -174,8 +141,7 @@ fun HomeScreen(
                     items(getTimerBlocks()) { block ->
                         TimerBlockCard(
                             block = block,
-                            onClick = { onBlockClick(block.type) },
-                            timerService = timerService
+                            onClick = { onBlockClick(block.type) }
                         )
                     }
                 }
@@ -235,19 +201,28 @@ fun HomeScreen(
 @Composable
 fun TimerBlockCard(
     block: TimerBlock,
-    onClick: () -> Unit,
-    timerService: TimerService?
+    onClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val isRunning by timerService?.isRunning?.collectAsState() ?: remember { mutableStateOf(false) }
-    val remainingSeconds by timerService?.remainingSeconds?.collectAsState() ?: remember { mutableIntStateOf(0) }
-    val isAlarmRinging by timerService?.isAlarmRinging?.collectAsState() ?: remember { mutableStateOf(false) }
+    val database = remember { me.aliahad.timemanager.data.TimerDatabase.getDatabase(context) }
+    
+    // For Focus Timer, get today's tracked time
+    var todayMinutes by remember { mutableIntStateOf(0) }
+    
+    if (block.type == TimerBlockType.FOCUS_TIMER) {
+        LaunchedEffect(Unit) {
+            while (true) {
+                val today = getTodayDateString()
+                todayMinutes = database.timeSessionDao().getTotalMinutesForDate(today) ?: 0
+                kotlinx.coroutines.delay(60000) // Update every minute
+            }
+        }
+    }
     
     // For Habit Tracker, get habit count
     var habitCount by remember { mutableIntStateOf(0) }
     
     if (block.type == TimerBlockType.HABIT_TRACKER) {
-        val database = remember { me.aliahad.timemanager.data.TimerDatabase.getDatabase(context) }
         val habits by database.habitDao().getAllActiveHabits().collectAsState(initial = emptyList())
         habitCount = habits.size
     }
@@ -256,9 +231,16 @@ fun TimerBlockCard(
     var calculationCount by remember { mutableIntStateOf(0) }
     
     if (block.type == TimerBlockType.YEAR_CALCULATOR) {
-        val database = remember { me.aliahad.timemanager.data.TimerDatabase.getDatabase(context) }
         val calculations by database.dateCalculationDao().getAllCalculations().collectAsState(initial = emptyList())
         calculationCount = calculations.size
+    }
+    
+    // For BMI Calculator, get saved BMI count
+    var bmiCount by remember { mutableIntStateOf(0) }
+    
+    if (block.type == TimerBlockType.BMI_CALCULATOR) {
+        val bmiCalculations by database.bmiCalculationDao().getAllCalculations().collectAsState(initial = emptyList())
+        bmiCount = bmiCalculations.size
     }
     
     Card(
@@ -268,13 +250,7 @@ fun TimerBlockCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = when {
-                isAlarmRinging && block.type == TimerBlockType.FOCUS_TIMER -> 
-                    MaterialTheme.colorScheme.errorContainer
-                isRunning && block.type == TimerBlockType.FOCUS_TIMER -> 
-                    MaterialTheme.colorScheme.primaryContainer
-                else -> MaterialTheme.colorScheme.surface
-            }
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 0.dp,
@@ -284,13 +260,7 @@ fun TimerBlockCard(
         ),
         border = androidx.compose.foundation.BorderStroke(
             width = 1.5.dp,
-            color = when {
-                isAlarmRinging && block.type == TimerBlockType.FOCUS_TIMER -> 
-                    MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
-                isRunning && block.type == TimerBlockType.FOCUS_TIMER -> 
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                else -> block.baseColor.copy(alpha = 0.3f)
-            }
+            color = block.baseColor.copy(alpha = 0.3f)
         )
     ) {
         Column(
@@ -317,20 +287,10 @@ fun TimerBlockCard(
                         .clip(CircleShape)
                         .background(
                             brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                colors = when {
-                                    isAlarmRinging && block.type == TimerBlockType.FOCUS_TIMER -> listOf(
-                                        MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
-                                        MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
-                                    )
-                                    isRunning && block.type == TimerBlockType.FOCUS_TIMER -> listOf(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                                    )
-                                    else -> listOf(
-                                        block.baseColor.copy(alpha = 0.15f),
-                                        block.baseColor.copy(alpha = 0.25f)
-                                    )
-                                }
+                                colors = listOf(
+                                    block.baseColor.copy(alpha = 0.15f),
+                                    block.baseColor.copy(alpha = 0.25f)
+                                )
                             )
                         ),
                     contentAlignment = Alignment.Center
@@ -339,39 +299,25 @@ fun TimerBlockCard(
                         imageVector = block.icon,
                         contentDescription = block.title,
                         modifier = Modifier.size(40.dp),
-                        tint = when {
-                            isAlarmRinging && block.type == TimerBlockType.FOCUS_TIMER -> 
-                                MaterialTheme.colorScheme.error
-                            isRunning && block.type == TimerBlockType.FOCUS_TIMER -> 
-                                MaterialTheme.colorScheme.primary
-                            else -> block.baseColor
-                        }
+                        tint = block.baseColor
                     )
                 }
             
-            // Timer display or habit count
-            if (block.type == TimerBlockType.FOCUS_TIMER && (isRunning || isAlarmRinging)) {
-                val hours = remainingSeconds / 3600
-                val minutes = (remainingSeconds % 3600) / 60
-                val seconds = remainingSeconds % 60
-                
-                val timeText = if (hours > 0) {
-                    String.format("%d:%02d:%02d", hours, minutes, seconds)
-                } else {
-                    String.format("%d:%02d", minutes, seconds)
-                }
-                
+            // Display statistics for each block type
+            if (block.type == TimerBlockType.FOCUS_TIMER) {
                 Text(
-                    text = timeText,
+                    text = formatDuration(todayMinutes),
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp
+                        fontSize = 32.sp
                     ),
-                    color = when {
-                        isAlarmRinging -> MaterialTheme.colorScheme.error
-                        isRunning -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.onSurface
-                    },
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "today",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
             } else if (block.type == TimerBlockType.HABIT_TRACKER) {
@@ -406,6 +352,22 @@ fun TimerBlockCard(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
+            } else if (block.type == TimerBlockType.BMI_CALCULATOR) {
+                Text(
+                    text = "$bmiCount",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 32.sp
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = if (bmiCount == 1) "record" else "records",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
             } else {
                 Text(
                     text = "0:00",
@@ -432,7 +394,8 @@ data class TimerBlock(
 enum class TimerBlockType {
     FOCUS_TIMER,
     HABIT_TRACKER,
-    YEAR_CALCULATOR
+    YEAR_CALCULATOR,
+    BMI_CALCULATOR
 }
 
 // Get available timer blocks with varied colors
@@ -440,7 +403,7 @@ fun getTimerBlocks(): List<TimerBlock> {
     return listOf(
         TimerBlock(
             type = TimerBlockType.FOCUS_TIMER,
-            title = "Focus Timer",
+            title = "Focus Tracker",
             icon = Icons.Default.Timer,
             baseColor = Color(0xFFFF6B6B) // Vibrant Red
         ),
@@ -455,6 +418,12 @@ fun getTimerBlocks(): List<TimerBlock> {
             title = "Year Calculator",
             icon = Icons.Default.CalendarMonth,
             baseColor = Color(0xFF4DABF7) // Vibrant Blue
+        ),
+        TimerBlock(
+            type = TimerBlockType.BMI_CALCULATOR,
+            title = "BMI Calculator",
+            icon = Icons.Default.FitnessCenter,
+            baseColor = Color(0xFFAB47BC) // Vibrant Purple
         )
     )
 }

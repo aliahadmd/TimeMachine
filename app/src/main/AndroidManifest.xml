@@ -26,7 +26,9 @@
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.TimeManager"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:screenOrientation="sensor"
+            android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -34,25 +36,14 @@
             </intent-filter>
         </activity>
         
-        <service
-            android:name=".TimerService"
-            android:enabled="true"
+        <!-- Immersive Fullscreen Timer Activity -->
+        <activity
+            android:name=".ImmersiveTimerActivity"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="timer" />
-        </service>
-        
-        <service
-            android:name=".AlarmRingingService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="alarm" />
-        </service>
+            android:theme="@style/Theme.TimeManager"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+            android:launchMode="singleTask" />
         
         <receiver
             android:name=".HabitReminderReceiver"
@@ -70,10 +61,6 @@
             </intent-filter>
         </receiver>
         
-        <receiver
-            android:name=".TimerAlarmReceiver"
-            android:enabled="true"
-            android:exported="false" />
     </application>
 
 </manifest>
