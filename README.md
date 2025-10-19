@@ -2,14 +2,14 @@
 
 <div align="center">
 
-![TimeMachine](https://img.shields.io/badge/version-1.1.0-blue.svg)
+![TimeMachine](https://img.shields.io/badge/version-2.0.0-blue.svg)
 ![Android](https://img.shields.io/badge/platform-Android-green.svg)
 ![Min API](https://img.shields.io/badge/API-31%2B-brightgreen.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-purple.svg)
 
-**A beautiful, minimal timer app for Android built with Jetpack Compose**
+**A comprehensive productivity & health tracking app for Android built with Jetpack Compose**
 
-Perfect for focus sessions, breaks, meditation, cooking, Focus Timer technique, and more!
+Focus Tracker • Year Calculator • BMI Calculator • Habit Tracker
 
 [Download APK](https://github.com/aliahadmd/TimeMachine/releases/latest) • [Report Bug](https://github.com/aliahadmd/TimeMachine/issues) • [Request Feature](https://github.com/aliahadmd/TimeMachine/issues)
 
@@ -46,12 +46,12 @@ Perfect for focus sessions, breaks, meditation, cooking, Focus Timer technique, 
 - **Edge-to-Edge** - Immersive full-screen experience
 
 ### 🔧 Technical
-- **Lightweight** - Only 11MB APK size
+- **Optimized** - 23MB APK size with full feature set
 - **No Ads** - Completely ad-free experience
 - **No Internet Required** - Works 100% offline
-- **Battery Efficient** - Optimized foreground service for background operation
-- **Reliable** - Timer runs even when app is closed or phone is locked
-- **Real-time Updates** - Notification updates every second with remaining time
+- **Room Database** - Robust local data persistence
+- **Lifecycle Aware** - Smart UI updates and state management
+- **Real-time Sync** - Automatic data refresh across all screens
 - **ProGuard Optimized** - Minified and shrunk for performance
 
 ---
@@ -60,14 +60,14 @@ Perfect for focus sessions, breaks, meditation, cooking, Focus Timer technique, 
 
 ### Download APK
 1. Go to [Releases](https://github.com/aliahadmd/TimeMachine/releases/latest)
-2. Download `TimeMachine-v1.0.0.apk`
+2. Download `TimeMachineV2.0.0.apk`
 3. Enable "Install from Unknown Sources" in your Android settings
 4. Open the APK and install
 
 ### Minimum Requirements
 - **Android 12 (API 31) or higher**
 - **ARM or x86 processor**
-- **~15MB free storage**
+- **~30MB free storage**
 
 ---
 
