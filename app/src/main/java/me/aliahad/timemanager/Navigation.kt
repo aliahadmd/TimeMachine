@@ -13,23 +13,28 @@ fun TimeMachineNavigation() {
         navController = navController,
         startDestination = "home"
     ) {
-            composable("home") {
-                HomeScreen(
-                    onBlockClick = { blockType ->
-                        when (blockType) {
-                            TimerBlockType.FOCUS_TIMER -> navController.navigate("focus_timer")
-                            TimerBlockType.HABIT_TRACKER -> navController.navigate("habit_tracker")
-                        }
+        composable("home") {
+            HomeScreen(
+                onBlockClick = { blockType ->
+                    when (blockType) {
+                        TimerBlockType.FOCUS_TIMER -> navController.navigate("focus_timer")
+                        TimerBlockType.HABIT_TRACKER -> navController.navigate("habit_tracker")
+                        TimerBlockType.YEAR_CALCULATOR -> navController.navigate("year_calculator")
                     }
-                )
-            }
-            
-            composable("focus_timer") {
-                TimerScreen(onBackPress = { navController.popBackStack() })
-            }
-            
-            composable("habit_tracker") {
-                HabitTrackerScreen(onBackPress = { navController.popBackStack() })
-            }
+                }
+            )
+        }
+        
+        composable("focus_timer") {
+            TimerScreen(onBackPress = { navController.popBackStack() })
+        }
+        
+        composable("habit_tracker") {
+            HabitTrackerScreen(onBackPress = { navController.popBackStack() })
+        }
+        
+        composable("year_calculator") {
+            YearCalculatorScreen(onNavigateBack = { navController.popBackStack() })
+        }
     }
 }

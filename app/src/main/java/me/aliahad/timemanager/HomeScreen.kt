@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -251,22 +252,46 @@ fun TimerBlockCard(
         habitCount = habits.size
     }
     
+    // For Year Calculator, get saved calculations count
+    var calculationCount by remember { mutableIntStateOf(0) }
+    
+    if (block.type == TimerBlockType.YEAR_CALCULATOR) {
+        val database = remember { me.aliahad.timemanager.data.TimerDatabase.getDatabase(context) }
+        val calculations by database.dateCalculationDao().getAllCalculations().collectAsState(initial = emptyList())
+        calculationCount = calculations.size
+    }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(0.85f)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = when {
                 isAlarmRinging && block.type == TimerBlockType.FOCUS_TIMER -> 
                     MaterialTheme.colorScheme.errorContainer
                 isRunning && block.type == TimerBlockType.FOCUS_TIMER -> 
                     MaterialTheme.colorScheme.primaryContainer
-                else -> block.baseColor.copy(alpha = 0.15f)
+                else -> MaterialTheme.colorScheme.surface
             }
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 0.dp,
+            pressedElevation = 0.dp,
+            focusedElevation = 0.dp,
+            hoveredElevation = 0.dp
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.5.dp,
+            color = when {
+                isAlarmRinging && block.type == TimerBlockType.FOCUS_TIMER -> 
+                    MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
+                isRunning && block.type == TimerBlockType.FOCUS_TIMER -> 
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                else -> block.baseColor.copy(alpha = 0.3f)
+            }
+        )
     ) {
         Column(
             modifier = Modifier
@@ -285,36 +310,43 @@ fun TimerBlockCard(
                 textAlign = TextAlign.Center
             )
             
-                // Icon
-                Surface(
+                // Icon with gradient background
+                Box(
                     modifier = Modifier
-                        .size(64.dp),
-                    shape = CircleShape,
-                    color = when {
-                        isAlarmRinging && block.type == TimerBlockType.FOCUS_TIMER -> 
-                            MaterialTheme.colorScheme.error
-                        isRunning && block.type == TimerBlockType.FOCUS_TIMER -> 
-                            MaterialTheme.colorScheme.primary
-                        else -> block.baseColor.copy(alpha = 0.3f)
-                    }
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(
+                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                colors = when {
+                                    isAlarmRinging && block.type == TimerBlockType.FOCUS_TIMER -> listOf(
+                                        MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
+                                        MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+                                    )
+                                    isRunning && block.type == TimerBlockType.FOCUS_TIMER -> listOf(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                                    )
+                                    else -> listOf(
+                                        block.baseColor.copy(alpha = 0.15f),
+                                        block.baseColor.copy(alpha = 0.25f)
+                                    )
+                                }
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Icon(
-                            imageVector = block.icon,
-                            contentDescription = block.title,
-                            modifier = Modifier.size(32.dp),
-                            tint = when {
-                                isAlarmRinging && block.type == TimerBlockType.FOCUS_TIMER -> 
-                                    MaterialTheme.colorScheme.onError
-                                isRunning && block.type == TimerBlockType.FOCUS_TIMER -> 
-                                    MaterialTheme.colorScheme.onPrimary
-                                else -> block.baseColor
-                            }
-                        )
-                    }
+                    Icon(
+                        imageVector = block.icon,
+                        contentDescription = block.title,
+                        modifier = Modifier.size(40.dp),
+                        tint = when {
+                            isAlarmRinging && block.type == TimerBlockType.FOCUS_TIMER -> 
+                                MaterialTheme.colorScheme.error
+                            isRunning && block.type == TimerBlockType.FOCUS_TIMER -> 
+                                MaterialTheme.colorScheme.primary
+                            else -> block.baseColor
+                        }
+                    )
                 }
             
             // Timer display or habit count
@@ -358,6 +390,22 @@ fun TimerBlockCard(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
+            } else if (block.type == TimerBlockType.YEAR_CALCULATOR) {
+                Text(
+                    text = "$calculationCount",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 32.sp
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = if (calculationCount == 1) "calculation" else "calculations",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
             } else {
                 Text(
                     text = "0:00",
@@ -383,7 +431,8 @@ data class TimerBlock(
 
 enum class TimerBlockType {
     FOCUS_TIMER,
-    HABIT_TRACKER
+    HABIT_TRACKER,
+    YEAR_CALCULATOR
 }
 
 // Get available timer blocks with varied colors
@@ -393,13 +442,19 @@ fun getTimerBlocks(): List<TimerBlock> {
             type = TimerBlockType.FOCUS_TIMER,
             title = "Focus Timer",
             icon = Icons.Default.Timer,
-            baseColor = Color(0xFFE57373) // Soft Red
+            baseColor = Color(0xFFFF6B6B) // Vibrant Red
         ),
         TimerBlock(
             type = TimerBlockType.HABIT_TRACKER,
             title = "Habit Tracker",
             icon = Icons.Default.CheckCircle,
-            baseColor = Color(0xFF81C784) // Soft Green
+            baseColor = Color(0xFF51CF66) // Vibrant Green
+        ),
+        TimerBlock(
+            type = TimerBlockType.YEAR_CALCULATOR,
+            title = "Year Calculator",
+            icon = Icons.Default.CalendarMonth,
+            baseColor = Color(0xFF4DABF7) // Vibrant Blue
         )
     )
 }
