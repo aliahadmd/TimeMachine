@@ -140,12 +140,28 @@ fun calculateDateDifference(startDate: LocalDate, endDate: LocalDate): DateDiffe
 fun calculateNextOccurrence(startDate: LocalDate, currentDate: LocalDate): LocalDate {
     val currentYear = currentDate.year
     val monthDay = MonthDay.of(startDate.monthValue, startDate.dayOfMonth)
-    
-    var nextDate = monthDay.atYear(currentYear)
+
+    var nextDate = if (startDate.monthValue == 2 && startDate.dayOfMonth == 29) {
+        var candidateYear = currentYear
+        while (!Year.isLeap(candidateYear.toLong())) {
+            candidateYear++
+        }
+        monthDay.atYear(candidateYear)
+    } else {
+        monthDay.atYear(currentYear)
+    }
     
     // If this year's occurrence has passed, get next year's
     if (nextDate.isBefore(currentDate) || nextDate.isEqual(currentDate)) {
-        nextDate = monthDay.atYear(currentYear + 1)
+        var candidateYear = nextDate.year + 1
+        nextDate = if (startDate.monthValue == 2 && startDate.dayOfMonth == 29) {
+            while (!Year.isLeap(candidateYear.toLong())) {
+                candidateYear++
+            }
+            monthDay.atYear(candidateYear)
+        } else {
+            monthDay.atYear(candidateYear)
+        }
     }
     
     return nextDate
@@ -206,4 +222,3 @@ fun LocalDate.toMillis(): Long {
         .toInstant()
         .toEpochMilli()
 }
-

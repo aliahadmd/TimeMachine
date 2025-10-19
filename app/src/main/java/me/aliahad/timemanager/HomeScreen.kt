@@ -43,15 +43,22 @@ fun HomeScreen(
     var needsExactAlarmPermission by remember { mutableStateOf(false) }
     var showExactAlarmDialog by remember { mutableStateOf(false) }
     var dismissedExactAlarmBanner by remember { mutableStateOf(false) }
+    var dismissedNotificationBanner by remember {
+        mutableStateOf(
+            context.getSharedPreferences("notification_setup", Context.MODE_PRIVATE)
+                .getBoolean("dismissed_notification_banner", false)
+        )
+    }
     
     // Check notification settings whenever app comes to foreground
     DisposableEffect(Unit) {
         val checkSettings = {
             val configured = NotificationSettingsHelper.areNotificationChannelsConfigured(context)
             areNotificationsConfigured = configured
-            if (!configured && !showNotificationDialog) {
+            val prefs = context.getSharedPreferences("notification_setup", Context.MODE_PRIVATE)
+            dismissedNotificationBanner = prefs.getBoolean("dismissed_notification_banner", false)
+            if (!configured && !showNotificationDialog && !dismissedNotificationBanner) {
                 // Only show dialog on first launch or if user hasn't seen it this session
-                val prefs = context.getSharedPreferences("notification_setup", Context.MODE_PRIVATE)
                 val hasSeenDialog = prefs.getBoolean("has_seen_dialog", false)
                 if (!hasSeenDialog) {
                     showNotificationDialog = true
@@ -61,7 +68,6 @@ fun HomeScreen(
             val needsExact = ExactAlarmPermissionManager.needsExactAlarm(context)
             needsExactAlarmPermission = needsExact
             if (needsExact) {
-                val prefs = context.getSharedPreferences("notification_setup", Context.MODE_PRIVATE)
                 val hasSeenExactDialog = prefs.getBoolean("has_seen_exact_alarm_dialog", false)
                 if (!hasSeenExactDialog) {
                     showExactAlarmDialog = true
@@ -98,13 +104,17 @@ fun HomeScreen(
                 .statusBarsPadding()
         ) {
             // Show notification setup banner if needed
-            if (!areNotificationsConfigured) {
+            if (!areNotificationsConfigured && !dismissedNotificationBanner) {
                 NotificationSetupBanner(
                     onOpenSettings = {
                         NotificationSettingsHelper.openNotificationSettings(context)
                     },
                     onDismiss = {
-                        // User can dismiss banner, will re-check on next app open
+                        dismissedNotificationBanner = true
+                        context.getSharedPreferences("notification_setup", Context.MODE_PRIVATE)
+                            .edit()
+                            .putBoolean("dismissed_notification_banner", true)
+                            .apply()
                     }
                 )
             }

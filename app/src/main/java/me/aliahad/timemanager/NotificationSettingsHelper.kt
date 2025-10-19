@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -32,37 +33,29 @@ object NotificationSettingsHelper {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return true // Older Android versions don't need channel configuration
         }
-        
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        
-        // Check Timer Alarm channel (most critical) - must match TimerService.ALARM_CHANNEL_ID
-        val alarmChannel = notificationManager.getNotificationChannel("TimerAlarmChannel")
-        if (alarmChannel == null) {
-            android.util.Log.w("NotificationHelper", "Alarm channel not found - channels may not be created yet")
+
+        val notificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val reminderChannel = notificationManager.getNotificationChannel("HabitReminderChannel")
+        if (reminderChannel == null) {
+            android.util.Log.w(
+                "NotificationHelper",
+                "Habit reminder channel not found - likely not created yet"
+            )
             return false
         }
-        
-        val alarmConfigured = alarmChannel.sound != null && 
-                              alarmChannel.importance >= NotificationManager.IMPORTANCE_HIGH
-        
-        android.util.Log.d("NotificationHelper", "Alarm channel - Sound: ${alarmChannel.sound}, Importance: ${alarmChannel.importance}, Configured: $alarmConfigured")
-        
-        // Check Habit Reminder channel (optional - only if it exists)
-        val reminderChannel = notificationManager.getNotificationChannel("HabitReminderChannel")
-        val reminderConfigured = if (reminderChannel != null) {
-            val configured = reminderChannel.sound != null && 
-                           reminderChannel.importance >= NotificationManager.IMPORTANCE_HIGH
-            android.util.Log.d("NotificationHelper", "Reminder channel - Sound: ${reminderChannel.sound}, Importance: ${reminderChannel.importance}, Configured: $configured")
-            configured
-        } else {
-            android.util.Log.d("NotificationHelper", "Reminder channel not created yet - assuming OK")
-            true // If reminder channel doesn't exist yet, don't block based on it
-        }
-        
-        val allConfigured = alarmConfigured && reminderConfigured
-        android.util.Log.d("NotificationHelper", "✅ All channels configured: $allConfigured")
-        
-        return allConfigured
+
+        val reminderConfigured = reminderChannel.sound != null &&
+            reminderChannel.importance >= NotificationManager.IMPORTANCE_HIGH
+
+        android.util.Log.d(
+            "NotificationHelper",
+            "Reminder channel - Sound: ${reminderChannel.sound}, " +
+                "Importance: ${reminderChannel.importance}, Configured: $reminderConfigured"
+        )
+
+        return reminderConfigured
     }
     
     /**
@@ -193,10 +186,9 @@ fun NotificationSetupDialog(
                         Spacer(modifier = Modifier.height(12.dp))
                         
                         StepItem(number = "1", text = "Tap 'Open Settings' below")
-                        StepItem(number = "2", text = "Find 'Timer Alarm' channel")
+                        StepItem(number = "2", text = "Open 'Habit Reminders' channel")
                         StepItem(number = "3", text = "Enable Sound and Vibration")
                         StepItem(number = "4", text = "Scroll to 'Allow exact alarms' and turn it ON")
-                        StepItem(number = "5", text = "Repeat for 'Habit Reminders'")
                     }
                 }
                 
@@ -316,7 +308,7 @@ fun NotificationSetupBanner(
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
                 Text(
-                    text = "Enable sound and exact alarms",
+                    text = "Enable habit reminder sound and exact alarms",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                 )
@@ -324,6 +316,14 @@ fun NotificationSetupBanner(
             
             TextButton(onClick = onOpenSettings) {
                 Text("Setup")
+            }
+
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Dismiss reminder",
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
             }
         }
     }

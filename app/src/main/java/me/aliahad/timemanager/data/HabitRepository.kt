@@ -2,7 +2,9 @@ package me.aliahad.timemanager.data
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
@@ -15,11 +17,14 @@ class HabitRepository(val habitDao: HabitDao) {
             if (habit == null) return@map null
             
             val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+            val creationDate = Instant.ofEpochMilli(habit.createdAt)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
             
             // Get all completions for calculations
             val allCompletions = habitDao.getCompletionsInRange(
                 habitId,
-                LocalDate.ofEpochDay(habit.createdAt / (24 * 60 * 60 * 1000)).format(DateTimeFormatter.ISO_LOCAL_DATE),
+                creationDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
                 today
             )
             
@@ -34,7 +39,7 @@ class HabitRepository(val habitDao: HabitDao) {
             
             // Calculate completion rate (any completion / expected days)
             val daysSinceCreation = ChronoUnit.DAYS.between(
-                LocalDate.ofEpochDay(habit.createdAt / (24 * 60 * 60 * 1000)),
+                creationDate,
                 LocalDate.now()
             ).toInt() + 1
             
@@ -153,4 +158,3 @@ class HabitRepository(val habitDao: HabitDao) {
         return habitDao.getCompletionsInRange(habitId, startDate, endDate)
     }
 }
-

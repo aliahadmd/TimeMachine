@@ -3,6 +3,7 @@ package me.aliahad.timemanager
 import android.content.Context
 import android.os.VibrationEffect
 import android.os.Vibrator
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -147,6 +147,7 @@ fun HabitTrackerScreen(
     
     // Navigate to detail view
     selectedHabitId?.let { habitId ->
+        BackHandler { selectedHabitId = null }
         HabitDetailScreen(
             habitId = habitId,
             repository = repository,
@@ -213,13 +214,13 @@ fun HabitCard(
     val context = LocalContext.current
     val vibrator = remember { context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator }
     val scope = rememberCoroutineScope()
-    val today = remember { LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE) }
+    val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
     
     var showSubmitDialog by remember { mutableStateOf(false) }
     var todayCompletion by remember { mutableStateOf<HabitCompletion?>(null) }
     
     // Only fetch today's completion, not full stats
-    LaunchedEffect(habit.id) {
+    LaunchedEffect(habit.id, today) {
         todayCompletion = repository.habitDao.getCompletion(habit.id, today)
     }
     
@@ -416,4 +417,3 @@ fun HabitCard(
         )
     }
 }
-
