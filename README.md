@@ -19,7 +19,27 @@ Focus Tracker • Screen Time • Habit Tracker • Year Calculator • BMI Calc
 
 ## 📱 Screenshots
 
-> Add screenshots here when available
+<div align="center">
+
+### Home & Navigation
+<img src="TimeMachineAppScreenshot/1.png" width="250" alt="Home Screen"/> <img src="TimeMachineAppScreenshot/2.png" width="250" alt="Navigation Menu"/> <img src="TimeMachineAppScreenshot/3.png" width="250" alt="Profile Screen"/>
+
+### Focus Tracker & Screen Time
+<img src="TimeMachineAppScreenshot/4.png" width="250" alt="Focus Tracker"/> <img src="TimeMachineAppScreenshot/5.png" width="250" alt="Focus Sessions"/> <img src="TimeMachineAppScreenshot/6.png" width="250" alt="Screen Time"/>
+
+### Habit Tracker
+<img src="TimeMachineAppScreenshot/7.png" width="250" alt="Habit Tracker"/> <img src="TimeMachineAppScreenshot/8.png" width="250" alt="Habit Details"/> <img src="TimeMachineAppScreenshot/9.png" width="250" alt="Habit Analytics"/>
+
+### Expense & Subscription Tracker
+<img src="TimeMachineAppScreenshot/10.png" width="250" alt="Expense Tracker"/> <img src="TimeMachineAppScreenshot/11.png" width="250" alt="Expense Analytics"/> <img src="TimeMachineAppScreenshot/12.png" width="250" alt="Subscription Tracker"/>
+
+### Daily Planner & Calculators
+<img src="TimeMachineAppScreenshot/13.png" width="250" alt="Daily Planner"/> <img src="TimeMachineAppScreenshot/14.png" width="250" alt="BMI Calculator"/> <img src="TimeMachineAppScreenshot/15.png" width="250" alt="Year Calculator"/>
+
+### Settings & Data Management
+<img src="TimeMachineAppScreenshot/16.png" width="250" alt="Settings"/> <img src="TimeMachineAppScreenshot/17.png" width="250" alt="Data Backup"/>
+
+</div>
 
 ## ✨ Features
 
