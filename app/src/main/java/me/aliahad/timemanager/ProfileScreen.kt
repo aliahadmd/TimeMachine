@@ -66,7 +66,9 @@ fun ProfileScreen(onBack: () -> Unit) {
     // Load profile and statistics
     LaunchedEffect(refreshTrigger) {
         isLoading = true
-        withContext(Dispatchers.IO) {
+        
+        // Load data on IO dispatcher
+        val (loadedProfile, loadedStats) = withContext(Dispatchers.IO) {
             // Get or create profile
             var userProfile = database.userProfileDao().getProfileSync()
             if (userProfile == null) {
@@ -75,11 +77,17 @@ fun ProfileScreen(onBack: () -> Unit) {
                 database.userProfileDao().insertProfile(defaultProfile)
                 userProfile = database.userProfileDao().getProfileSync()
             }
-            profile = userProfile
             
             // Load statistics
-            statistics = ProfileAnalytics.getUserStatistics(database)
+            val stats = ProfileAnalytics.getUserStatistics(database)
+            
+            // Return the data to be assigned on main thread
+            Pair(userProfile, stats)
         }
+        
+        // Update Compose state on main dispatcher (automatically happens after withContext)
+        profile = loadedProfile
+        statistics = loadedStats
         isLoading = false
     }
     

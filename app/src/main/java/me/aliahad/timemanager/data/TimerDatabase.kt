@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 
 @Database(
     entities = [
@@ -23,6 +24,7 @@ import androidx.room.RoomDatabase
     version = 11,  // Added UserProfile entity
     exportSchema = false
 )
+@TypeConverters(Converters::class)
 abstract class TimerDatabase : RoomDatabase() {
     abstract fun presetDao(): PresetDao
     abstract fun habitDao(): HabitDao

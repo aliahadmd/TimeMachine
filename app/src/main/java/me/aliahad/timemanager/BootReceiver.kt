@@ -1,8 +1,13 @@
 package me.aliahad.timemanager
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.RingtoneManager
+import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +23,12 @@ class BootReceiver : BroadcastReceiver() {
             intent.action == Intent.ACTION_MY_PACKAGE_REPLACED
         ) {
             Log.d("BootReceiver", "🔄 Device rebooted, rescheduling...")
+            
+            // Call goAsync() to ensure the receiver stays alive during async work
+            val pendingResult = goAsync()
+            
+            // Recreate notification channel first (must be done before any notifications)
+            createReminderNotificationChannel(context)
             
             // Use a CoroutineScope for database operations
             CoroutineScope(Dispatchers.IO).launch {
@@ -66,8 +77,41 @@ class BootReceiver : BroadcastReceiver() {
                     
                 } catch (e: Exception) {
                     Log.e("BootReceiver", "❌ Error on boot: ${e.message}")
+                } finally {
+                    // Signal that async work is complete
+                    pendingResult.finish()
                 }
             }
+        }
+    }
+    
+    private fun createReminderNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val reminderSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            
+            val audioAttributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .build()
+            
+            val channel = NotificationChannel(
+                "HabitReminderChannel",
+                "Habit Reminders",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Daily reminders for your habits"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250, 250, 250)
+                enableLights(true)
+                lightColor = android.graphics.Color.GREEN
+                setSound(reminderSound, audioAttributes)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setShowBadge(true)
+            }
+            
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+            Log.d("BootReceiver", "✅ Notification channel recreated")
         }
     }
 }

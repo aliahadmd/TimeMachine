@@ -8,21 +8,19 @@ plugins {
 
 android {
     namespace = "me.aliahad.timemanager"
-    compileSdk = 36
+    compileSdk = 36  // Required by dependencies (androidx.core:core:1.17.0, etc.)
 
-    signingConfigs {
-        create("release") {
-            storeFile = file("release-keystore.jks")
-            storePassword = "android123"
-            keyAlias = "timemanager"
-            keyPassword = "android123"
-        }
-    }
-
+    // Signing config removed from source control for security
+    // To sign releases, create a keystore.properties file with:
+    // storeFile=path/to/keystore.jks
+    // storePassword=your_store_password
+    // keyAlias=your_key_alias
+    // keyPassword=your_key_password
+    
     defaultConfig {
         applicationId = "me.aliahad.timemanager"
         minSdk = 31
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 5
         versionName = "2.0.0"
 
@@ -41,7 +39,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            // Signing config should be configured locally via keystore.properties
+            // signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
