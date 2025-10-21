@@ -135,7 +135,8 @@ fun ExpenseTrackerScreen(onBack: () -> Unit) {
                     database = database,
                     refreshTrigger = refreshTrigger,
                     onRefresh = { refreshTrigger++ },
-                    currency = currency
+                    currency = currency,
+                    onNavigateToCategories = { selectedTab = 3 }  // Switch to Categories tab
                 )
                 1 -> ExpenseListTab(database = database, refreshTrigger = refreshTrigger, currency = currency)
                 2 -> StatsTab(database = database, refreshTrigger = refreshTrigger, currency = currency)
@@ -155,7 +156,8 @@ fun AddExpenseTab(
     database: TimerDatabase,
     refreshTrigger: Int,
     onRefresh: () -> Unit,
-    currency: String
+    currency: String,
+    onNavigateToCategories: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -256,8 +258,8 @@ fun AddExpenseTab(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                TextButton(onClick = { /* Switch to categories tab */ }) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                TextButton(onClick = onNavigateToCategories) {
+                    Icon(Icons.Default.Settings, null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Manage", fontSize = 12.sp)
                 }

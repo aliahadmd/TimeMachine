@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "me.aliahad.timemanager"
-    compileSdk = 36  // Required by dependencies (androidx.core:core:1.17.0, etc.)
+    compileSdk = 35  // Latest stable SDK (dependencies downgraded for compatibility)
 
     // Signing config removed from source control for security
     // To sign releases, create a keystore.properties file with:

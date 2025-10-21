@@ -38,20 +38,14 @@ class MainActivity : ComponentActivity() {
             }
         }
         
-        // Request exact alarm permission for Android 12+
+        // Check exact alarm permission for Android 12+ (but don't launch settings immediately)
+        // This permission is needed for habit reminders to work precisely
+        // The app will show an in-app prompt when user tries to set a reminder
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
             if (!alarmManager.canScheduleExactAlarms()) {
-                // Open settings to allow exact alarms
-                try {
-                    val intent = android.content.Intent(
-                        android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                        android.net.Uri.parse("package:$packageName")
-                    )
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    android.util.Log.e("MainActivity", "Cannot open exact alarm settings: ${e.message}")
-                }
+                // Log for debugging - actual permission request happens in NotificationScheduler
+                android.util.Log.d("MainActivity", "Exact alarm permission not granted - will prompt when needed")
             }
         }
         

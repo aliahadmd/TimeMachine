@@ -50,6 +50,10 @@ fun SubscriptionTrackerScreen(onBack: () -> Unit) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     
+    // Get user's currency preference
+    val userProfile by database.userProfileDao().getProfile().collectAsState(initial = null)
+    val currency = userProfile?.currency ?: "৳"
+    
     // Refresh data when screen resumes
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -114,10 +118,11 @@ fun SubscriptionTrackerScreen(onBack: () -> Unit) {
                 0 -> SubscriptionsTab(
                     database = database,
                     refreshTrigger = refreshTrigger,
-                    onRefresh = { refreshTrigger++ }
+                    onRefresh = { refreshTrigger++ },
+                    currency = currency
                 )
-                1 -> CalendarTab(database = database, refreshTrigger = refreshTrigger)
-                2 -> SubscriptionStatsTab(database = database, refreshTrigger = refreshTrigger)
+                1 -> CalendarTab(database = database, refreshTrigger = refreshTrigger, currency = currency)
+                2 -> SubscriptionStatsTab(database = database, refreshTrigger = refreshTrigger, currency = currency)
             }
         }
     }
@@ -127,7 +132,8 @@ fun SubscriptionTrackerScreen(onBack: () -> Unit) {
 fun SubscriptionsTab(
     database: TimerDatabase,
     refreshTrigger: Int,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    currency: String
 ) {
     val scope = rememberCoroutineScope()
     val subscriptions by database.subscriptionDao().getAllSubscriptions()
@@ -243,6 +249,7 @@ fun SubscriptionsTab(
     if (showAddDialog || editingSubscription != null) {
         SubscriptionDialog(
             subscription = editingSubscription,
+            currency = currency,
             onDismiss = {
                 showAddDialog = false
                 editingSubscription = null
@@ -473,6 +480,7 @@ fun SubscriptionCard(
 @Composable
 fun SubscriptionDialog(
     subscription: Subscription?,
+    currency: String,
     onDismiss: () -> Unit,
     onSave: (Subscription) -> Unit
 ) {
@@ -818,6 +826,7 @@ fun SubscriptionDialog(
                                         id = subscription?.id ?: 0,
                                         name = name.trim(),
                                         cost = cost.toDouble(),
+                                        currency = currency,  // Use user's selected currency
                                         billingCycle = billingCycle,
                                         startDate = startDate,
                                         nextBillingDate = nextBillingDate,
@@ -872,7 +881,7 @@ fun showDatePickerDialog(
 }
 
 @Composable
-fun CalendarTab(database: TimerDatabase, refreshTrigger: Int) {
+fun CalendarTab(database: TimerDatabase, refreshTrigger: Int, currency: String) {
     val subscriptions by database.subscriptionDao().getActiveSubscriptions()
         .collectAsState(initial = emptyList())
     
@@ -1030,7 +1039,7 @@ fun RenewalCard(renewal: SubscriptionAnalytics.UpcomingRenewal) {
 }
 
 @Composable
-fun SubscriptionStatsTab(database: TimerDatabase, refreshTrigger: Int) {
+fun SubscriptionStatsTab(database: TimerDatabase, refreshTrigger: Int, currency: String) {
     val subscriptions by database.subscriptionDao().getAllSubscriptions()
         .collectAsState(initial = emptyList())
     

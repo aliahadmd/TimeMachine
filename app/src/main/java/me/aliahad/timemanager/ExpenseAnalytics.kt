@@ -37,9 +37,11 @@ object ExpenseAnalytics {
         return startOfYear.format(dateFormatter) to endOfYear.format(dateFormatter)
     }
     
-    // Format currency
+    // Format currency with smart negative handling
     fun formatCurrency(amount: Double, currency: String = "৳"): String {
-        return "$currency%.2f".format(abs(amount))
+        // Smart prefix for refunds/credits: "-$50.00" instead of "$-50.00"
+        val prefix = if (amount < 0) "-" else ""
+        return "$prefix$currency%.2f".format(kotlin.math.abs(amount))
     }
     
     // Calculate category spending

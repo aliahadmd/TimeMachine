@@ -46,12 +46,11 @@ fun SettingsScreen(onBack: () -> Unit) {
     
     // Load user profile for currency setting
     val userProfile by database.userProfileDao().getProfile().collectAsState(initial = null)
-    var selectedCurrency by remember { mutableStateOf("৳") }
+    val selectedCurrency = userProfile?.currency ?: "৳"  // Derived directly from database
     
+    // Log profile state for debugging
     LaunchedEffect(userProfile) {
-        userProfile?.let { profile ->
-            selectedCurrency = profile.currency
-        }
+        android.util.Log.d("SettingsScreen", "Profile loaded: ${userProfile?.let { "id=${it.id}, currency=${it.currency}" } ?: "null"}")
     }
     
     // File picker for export (create document)
@@ -366,17 +365,29 @@ fun SettingsScreen(onBack: () -> Unit) {
                 scope.launch {
                     try {
                         withContext(Dispatchers.IO) {
-                            userProfile?.let { profile ->
+                            // Get or create profile
+                            var profile = database.userProfileDao().getProfileSync()
+                            if (profile == null) {
+                                // Create default profile with selected currency
+                                val defaultProfile = me.aliahad.timemanager.data.UserProfile(
+                                    currency = newCurrency
+                                )
+                                database.userProfileDao().insertProfile(defaultProfile)
+                                android.util.Log.d("SettingsScreen", "Created new profile with currency: $newCurrency")
+                            } else {
+                                // Update existing profile
                                 val updatedProfile = profile.copy(
                                     currency = newCurrency,
                                     updatedAt = System.currentTimeMillis()
                                 )
                                 database.userProfileDao().updateProfile(updatedProfile)
+                                android.util.Log.d("SettingsScreen", "Updated profile currency to: $newCurrency")
                             }
                         }
-                        selectedCurrency = newCurrency
+                        // No need to update local state - Flow will automatically update UI
                         operationMessage = "✅ Currency updated to $newCurrency" to true
                     } catch (e: Exception) {
+                        android.util.Log.e("SettingsScreen", "Failed to update currency", e)
                         operationMessage = "❌ Failed to update currency: ${e.message}" to false
                     }
                 }
