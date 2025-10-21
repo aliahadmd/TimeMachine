@@ -53,5 +53,11 @@ interface HabitDao {
     
     @Query("SELECT COUNT(*) FROM habit_completions WHERE habitId = :habitId AND date >= :startDate")
     suspend fun getCompletionsSince(habitId: Long, startDate: String): Int
+    
+    @Query("SELECT * FROM habits ORDER BY createdAt DESC")
+    suspend fun getAllHabitsSync(): List<Habit>
+    
+    @Query("SELECT * FROM habit_completions")
+    suspend fun getAllCompletionsSync(): List<HabitCompletion>
 }
 

@@ -25,5 +25,8 @@ interface ExpenseCategoryDao {
     
     @Query("SELECT COUNT(*) FROM expense_categories")
     suspend fun getCategoryCount(): Int
+    
+    @Query("SELECT * FROM expense_categories ORDER BY name ASC")
+    suspend fun getAllCategoriesSync(): List<ExpenseCategory>
 }
 

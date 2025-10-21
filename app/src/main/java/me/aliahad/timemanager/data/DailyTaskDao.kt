@@ -40,5 +40,8 @@ interface DailyTaskDao {
     
     @Query("DELETE FROM daily_tasks WHERE date < :beforeDate")
     suspend fun deleteOldTasks(beforeDate: String)
+    
+    @Query("SELECT * FROM daily_tasks ORDER BY date DESC, startTime ASC")
+    suspend fun getAllTasks(): List<DailyTask>
 }
 

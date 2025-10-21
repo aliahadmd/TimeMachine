@@ -1,9 +1,17 @@
 package me.aliahad.timemanager.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "daily_tasks")
+@Entity(
+    tableName = "daily_tasks",
+    indices = [
+        Index(value = ["date"]),  // Frequently queried by date
+        Index(value = ["date", "isCompleted"]),  // Composite index for filtering
+        Index(value = ["isRecurring"])  // For recurring task queries
+    ]
+)
 data class DailyTask(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

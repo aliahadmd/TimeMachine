@@ -86,6 +86,9 @@ interface TimeSessionDao {
         SELECT COUNT(*) FROM time_sessions WHERE date = :date
     """)
     suspend fun getSessionCountForDate(date: String): Int
+    
+    @Query("SELECT * FROM time_sessions ORDER BY startTime DESC")
+    suspend fun getAllSessionsSync(): List<TimeSession>
 }
 
 // Raw data class for Room query result

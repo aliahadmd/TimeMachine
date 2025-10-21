@@ -521,7 +521,8 @@ enum class TimerBlockType {
     BMI_CALCULATOR,
     EXPENSE_TRACKER,
     SUBSCRIPTION_TRACKER,
-    DAILY_PLANNER
+    DAILY_PLANNER,
+    PROFILE
 }
 
 // Get available timer blocks with varied colors
@@ -568,6 +569,12 @@ fun getTimerBlocks(): List<TimerBlock> {
             title = "Daily Planner",
             icon = Icons.Default.EditCalendar,
             baseColor = Color(0xFF6C63FF) // Vibrant Indigo
+        ),
+        TimerBlock(
+            type = TimerBlockType.PROFILE,
+            title = "Profile",
+            icon = Icons.Default.Person,
+            baseColor = Color(0xFFE91E63) // Vibrant Pink
         )
     )
 }

@@ -46,5 +46,8 @@ interface SubscriptionDao {
     
     @Query("SELECT DISTINCT category FROM subscriptions WHERE isActive = 1")
     suspend fun getAllCategories(): List<String>
+    
+    @Query("SELECT * FROM subscriptions ORDER BY nextBillingDate ASC")
+    suspend fun getAllSubscriptionsSync(): List<Subscription>
 }
 

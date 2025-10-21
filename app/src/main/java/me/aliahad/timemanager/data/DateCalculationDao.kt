@@ -31,5 +31,8 @@ interface DateCalculationDao {
     
     @Query("SELECT COUNT(*) FROM date_calculations")
     suspend fun getCalculationCount(): Int
+    
+    @Query("SELECT * FROM date_calculations ORDER BY updatedAt DESC")
+    suspend fun getAllCalculationsSync(): List<DateCalculation>
 }
 

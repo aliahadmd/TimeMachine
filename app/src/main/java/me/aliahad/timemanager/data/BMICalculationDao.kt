@@ -31,5 +31,8 @@ interface BMICalculationDao {
     
     @Query("DELETE FROM bmi_calculations")
     suspend fun deleteAllCalculations()
+    
+    @Query("SELECT * FROM bmi_calculations ORDER BY updatedAt DESC")
+    suspend fun getAllRecordsSync(): List<BMICalculation>
 }
 

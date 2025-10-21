@@ -26,7 +26,20 @@ enum class HabitType {
 
 @Entity(
     tableName = "habit_completions",
-    primaryKeys = ["habitId", "date"]
+    primaryKeys = ["habitId", "date"],
+    foreignKeys = [
+        androidx.room.ForeignKey(
+            entity = Habit::class,
+            parentColumns = ["id"],
+            childColumns = ["habitId"],
+            onDelete = androidx.room.ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        androidx.room.Index(value = ["habitId"]),  // For FK constraint
+        androidx.room.Index(value = ["date"]),  // For date range queries
+        androidx.room.Index(value = ["habitId", "date"])  // Composite (already PK, but explicit)
+    ]
 )
 data class HabitCompletion(
     val habitId: Long,

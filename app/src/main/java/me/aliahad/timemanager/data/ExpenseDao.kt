@@ -40,5 +40,8 @@ interface ExpenseDao {
     
     @Query("DELETE FROM expenses WHERE date < :date")
     suspend fun deleteExpensesBefore(date: String)
+    
+    @Query("SELECT * FROM expenses ORDER BY timestamp DESC")
+    suspend fun getAllExpensesSync(): List<Expense>
 }
 

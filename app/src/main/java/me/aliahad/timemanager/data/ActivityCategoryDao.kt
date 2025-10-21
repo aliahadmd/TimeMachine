@@ -34,5 +34,8 @@ interface ActivityCategoryDao {
     
     @Query("UPDATE activity_categories SET sortOrder = :sortOrder WHERE id = :id")
     suspend fun updateSortOrder(id: Long, sortOrder: Int)
+    
+    @Query("SELECT * FROM activity_categories ORDER BY sortOrder ASC, createdAt DESC")
+    suspend fun getAllCategoriesSync(): List<ActivityCategory>
 }
 

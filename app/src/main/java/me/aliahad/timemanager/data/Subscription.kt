@@ -1,9 +1,18 @@
 package me.aliahad.timemanager.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "subscriptions")
+@Entity(
+    tableName = "subscriptions",
+    indices = [
+        Index(value = ["nextBillingDate"]),  // For sorting by next billing
+        Index(value = ["isActive"]),  // For filtering active subscriptions
+        Index(value = ["isActive", "nextBillingDate"]),  // Composite for queries
+        Index(value = ["isTrial", "isActive"])  // For trial subscription queries
+    ]
+)
 data class Subscription(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

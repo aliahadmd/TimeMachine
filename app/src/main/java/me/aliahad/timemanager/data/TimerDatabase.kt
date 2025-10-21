@@ -17,9 +17,10 @@ import androidx.room.RoomDatabase
         Expense::class,
         ExpenseCategory::class,
         Subscription::class,
-        DailyTask::class
+        DailyTask::class,
+        UserProfile::class
     ],
-    version = 9,
+    version = 11,  // Added UserProfile entity
     exportSchema = false
 )
 abstract class TimerDatabase : RoomDatabase() {
@@ -33,6 +34,7 @@ abstract class TimerDatabase : RoomDatabase() {
     abstract fun expenseCategoryDao(): ExpenseCategoryDao
     abstract fun subscriptionDao(): SubscriptionDao
     abstract fun dailyTaskDao(): DailyTaskDao
+    abstract fun userProfileDao(): UserProfileDao
     
     companion object {
         @Volatile
