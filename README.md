@@ -2,14 +2,14 @@
 
 <div align="center">
 
-![TimeMachine](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![TimeMachine](https://img.shields.io/badge/version-3.0.0-blue.svg)
 ![Android](https://img.shields.io/badge/platform-Android-green.svg)
 ![Min API](https://img.shields.io/badge/API-31%2B-brightgreen.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-purple.svg)
 
 **A comprehensive productivity & health tracking app for Android built with Jetpack Compose**
 
-Focus Tracker • Year Calculator • BMI Calculator • Habit Tracker
+Focus Tracker • Screen Time • Habit Tracker • Year Calculator • BMI Calculator • Expense Tracker • Subscription Tracker • Daily Planner
 
 [Download APK](https://github.com/aliahadmd/TimeMachine/releases/latest) • [Report Bug](https://github.com/aliahadmd/TimeMachine/issues) • [Request Feature](https://github.com/aliahadmd/TimeMachine/issues)
 
@@ -46,12 +46,14 @@ Focus Tracker • Year Calculator • BMI Calculator • Habit Tracker
 - **Edge-to-Edge** - Immersive full-screen experience
 
 ### 🔧 Technical
-- **Optimized** - 23MB APK size with full feature set
+- **Comprehensive** - 58MB APK with 8+ productivity modules
 - **No Ads** - Completely ad-free experience
 - **No Internet Required** - Works 100% offline
-- **Room Database** - Robust local data persistence
+- **Room Database v13** - Robust local data persistence
 - **Lifecycle Aware** - Smart UI updates and state management
 - **Real-time Sync** - Automatic data refresh across all screens
+- **WorkManager** - Battery-efficient background tasks
+- **UsageStats API** - System-level accurate screen time tracking
 - **ProGuard Optimized** - Minified and shrunk for performance
 
 ---
@@ -60,14 +62,14 @@ Focus Tracker • Year Calculator • BMI Calculator • Habit Tracker
 
 ### Download APK
 1. Go to [Releases](https://github.com/aliahadmd/TimeMachine/releases/latest)
-2. Download `TimeMachineV2.0.0.apk`
+2. Download `TimeMachineV3.0.0.apk`
 3. Enable "Install from Unknown Sources" in your Android settings
 4. Open the APK and install
 
 ### Minimum Requirements
 - **Android 12 (API 31) or higher**
 - **ARM or x86 processor**
-- **~30MB free storage**
+- **~100MB free storage** (58MB APK + data)
 
 ---
 

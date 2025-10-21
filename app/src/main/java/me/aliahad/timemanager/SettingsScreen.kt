@@ -211,7 +211,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 SettingsCard(
                     icon = Icons.Default.Info,
                     title = "App Information",
-                    subtitle = "Version 2.0.0",
+                    subtitle = "Version 3.0.0",
                     iconColor = Color(0xFF9C27B0),
                     onClick = { showAboutDialog = true }
                 )
@@ -221,7 +221,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 SettingsCard(
                     icon = Icons.Default.Storage,
                     title = "Database Version",
-                    subtitle = "Version 11",
+                    subtitle = "Version 13",
                     iconColor = Color(0xFFFF9800),
                     onClick = { }
                 )
@@ -712,7 +712,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Version 2.0.0",
+                            text = "Version 3.0.0",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
@@ -759,7 +759,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "• Version: 11",
+                            text = "• Version: 13",
                             style = MaterialTheme.typography.bodySmall
                         )
                         Text(
