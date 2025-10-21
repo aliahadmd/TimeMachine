@@ -52,6 +52,10 @@ class MainActivity : ComponentActivity() {
         // Create reminder notification channel
         createReminderNotificationChannel()
         
+        // Schedule Screen Time tracking work
+        ScreenTimeScheduler.ensurePeriodicWork(this)
+        ScreenTimeScheduler.triggerImmediateSync(this)
+        
         enableEdgeToEdge()
         setContent {
             TimeManagerTheme {

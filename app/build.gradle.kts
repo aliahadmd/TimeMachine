@@ -65,6 +65,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
     
     // Navigation Compose
     implementation(libs.androidx.navigation.compose)

@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">TimeMachine</string>
+    <string name="focus_tracker_widget_description">Track your focus time with real-time progress updates</string>
 </resources>

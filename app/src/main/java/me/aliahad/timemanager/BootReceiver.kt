@@ -73,7 +73,13 @@ class BootReceiver : BroadcastReceiver() {
                     }
                     
                     // Note: Old timer restore logic removed - new Focus Tracker uses database sessions
-                    Log.d("BootReceiver", "✅ Boot completed, habit reminders rescheduled")
+                    
+                    // Schedule screen time background work
+                    ScreenTimeScheduler.ensurePeriodicWork(context)
+                    ScreenTimeScheduler.triggerImmediateSync(context)
+                    Log.d("BootReceiver", "✅ Screen Time work scheduled on boot")
+                    
+                    Log.d("BootReceiver", "✅ Boot completed, all services initialized")
                     
                 } catch (e: Exception) {
                     Log.e("BootReceiver", "❌ Error on boot: ${e.message}")

@@ -26,6 +26,7 @@ fun TimeMachineNavigation() {
                         TimerBlockType.DAILY_PLANNER -> navController.navigate("daily_planner")
                         TimerBlockType.PROFILE -> navController.navigate("profile")
                         TimerBlockType.SETTINGS -> navController.navigate("settings")
+                        TimerBlockType.SCREEN_TIMER -> navController.navigate("screen_timer")
                     }
                 }
             )
@@ -65,6 +66,10 @@ fun TimeMachineNavigation() {
         
         composable("settings") {
             SettingsScreen(onBack = { navController.popBackStack() })
+        }
+        
+        composable("screen_timer") {
+            ScreenTimerScreen(onBack = { navController.popBackStack() })
         }
     }
 }

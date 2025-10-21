@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -346,6 +347,18 @@ fun TimerBlockCard(
         }
     }
     
+    // For Screen Timer, get today's screen time
+    var todayScreenTime by remember { mutableIntStateOf(0) }
+    var todayPickups by remember { mutableIntStateOf(0) }
+    
+    if (block.type == TimerBlockType.SCREEN_TIMER) {
+        val todayDate = remember { getTodayDateString() }
+        val summaryFlow = remember(todayDate) { database.screenTimeDao().getDailySummaryFlow(todayDate) }
+        val summary by summaryFlow.collectAsState(initial = null)
+        todayScreenTime = summary?.totalScreenTimeSeconds ?: 0
+        todayPickups = summary?.pickupsCount ?: 0
+    }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -558,6 +571,22 @@ fun TimerBlockCard(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
+            } else if (block.type == TimerBlockType.SCREEN_TIMER) {
+                Text(
+                    text = ScreenTimeAnalytics.formatDuration(todayScreenTime),
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 32.sp
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "$todayPickups pickups",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
             } else {
                 // Fallback for any future block types
                 Text(
@@ -588,7 +617,8 @@ enum class TimerBlockType {
     SUBSCRIPTION_TRACKER,
     DAILY_PLANNER,
     PROFILE,
-    SETTINGS
+    SETTINGS,
+    SCREEN_TIMER
 }
 
 // Get available timer blocks with varied colors
@@ -647,6 +677,12 @@ fun getTimerBlocks(): List<TimerBlock> {
             title = "Settings",
             icon = Icons.Default.Settings,
             baseColor = Color(0xFF607D8B) // Vibrant Blue Grey
+        ),
+        TimerBlock(
+            type = TimerBlockType.SCREEN_TIMER,
+            title = "Screen Timer",
+            icon = Icons.Default.PhoneAndroid,
+            baseColor = Color(0xFF00BCD4) // Vibrant Cyan
         )
     )
 }

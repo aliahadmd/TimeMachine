@@ -19,9 +19,12 @@ import androidx.room.TypeConverters
         ExpenseCategory::class,
         Subscription::class,
         DailyTask::class,
-        UserProfile::class
+        UserProfile::class,
+        ScreenTimeSession::class,
+        ScreenTimeDailySummary::class,
+        ScreenTimeHourly::class
     ],
-    version = 11,  // Added UserProfile entity
+    version = 12,  // Added Screen Time tracking
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -37,6 +40,7 @@ abstract class TimerDatabase : RoomDatabase() {
     abstract fun subscriptionDao(): SubscriptionDao
     abstract fun dailyTaskDao(): DailyTaskDao
     abstract fun userProfileDao(): UserProfileDao
+    abstract fun screenTimeDao(): ScreenTimeDao
     
     companion object {
         @Volatile
