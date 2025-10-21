@@ -287,6 +287,19 @@ fun TimerBlockCard(
         }
     }
     
+    // For Subscription Tracker, get active subscriptions count and monthly cost
+    var activeSubsCount by remember { mutableIntStateOf(0) }
+    
+    if (block.type == TimerBlockType.SUBSCRIPTION_TRACKER) {
+        LaunchedEffect(refreshTrigger) {
+            while (true) {
+                val count = database.subscriptionDao().getActiveSubscriptionCount()
+                activeSubsCount = count
+                kotlinx.coroutines.delay(5000)
+            }
+        }
+    }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -429,6 +442,22 @@ fun TimerBlockCard(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
+            } else if (block.type == TimerBlockType.SUBSCRIPTION_TRACKER) {
+                Text(
+                    text = "$activeSubsCount",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 32.sp
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = if (activeSubsCount == 1) "subscription" else "subscriptions",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
             } else {
                 Text(
                     text = "0:00",
@@ -457,7 +486,8 @@ enum class TimerBlockType {
     HABIT_TRACKER,
     YEAR_CALCULATOR,
     BMI_CALCULATOR,
-    EXPENSE_TRACKER
+    EXPENSE_TRACKER,
+    SUBSCRIPTION_TRACKER
 }
 
 // Get available timer blocks with varied colors
@@ -492,6 +522,12 @@ fun getTimerBlocks(): List<TimerBlock> {
             title = "Expense Tracker",
             icon = Icons.Default.AccountBalanceWallet,
             baseColor = Color(0xFFFFAB40) // Vibrant Orange
+        ),
+        TimerBlock(
+            type = TimerBlockType.SUBSCRIPTION_TRACKER,
+            title = "Subscription Tracker",
+            icon = Icons.Default.Subscriptions,
+            baseColor = Color(0xFF20C997) // Vibrant Teal
         )
     )
 }

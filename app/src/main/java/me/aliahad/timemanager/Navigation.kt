@@ -22,6 +22,7 @@ fun TimeMachineNavigation() {
                         TimerBlockType.YEAR_CALCULATOR -> navController.navigate("year_calculator")
                         TimerBlockType.BMI_CALCULATOR -> navController.navigate("bmi_calculator")
                         TimerBlockType.EXPENSE_TRACKER -> navController.navigate("expense_tracker")
+                        TimerBlockType.SUBSCRIPTION_TRACKER -> navController.navigate("subscription_tracker")
                     }
                 }
             )
@@ -45,6 +46,10 @@ fun TimeMachineNavigation() {
         
         composable("expense_tracker") {
             ExpenseTrackerScreen(onBack = { navController.popBackStack() })
+        }
+        
+        composable("subscription_tracker") {
+            SubscriptionTrackerScreen(onBack = { navController.popBackStack() })
         }
     }
 }
