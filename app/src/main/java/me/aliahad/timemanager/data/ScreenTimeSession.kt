@@ -6,7 +6,11 @@ import androidx.room.Index
 
 @Entity(
     tableName = "screen_time_sessions",
-    indices = [Index(value = ["date"]), Index(value = ["timestamp"])]
+    indices = [
+        Index(value = ["date"]),
+        Index(value = ["timestamp"]),
+        Index(value = ["sessionStart"], unique = true)
+    ]
 )
 data class ScreenTimeSession(
     @PrimaryKey(autoGenerate = true)
@@ -53,4 +57,3 @@ data class ScreenTimeHourly(
     val screenTimeSeconds: Int,
     val pickupsCount: Int
 )
-

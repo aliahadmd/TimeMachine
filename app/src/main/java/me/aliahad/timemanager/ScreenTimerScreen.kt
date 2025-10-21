@@ -133,7 +133,7 @@ fun ScreenTimerScreen(onBack: () -> Unit) {
             
             // Tab Content
             when (selectedTab) {
-                0 -> TodayTab(database = database)
+                0 -> TodayTab(database = database, hasUsageAccess = hasUsageAccess)
                 1 -> AnalyticsTab(database = database, refreshTrigger = refreshTrigger)
                 2 -> HistoryTab(database = database, refreshTrigger = refreshTrigger)
             }
@@ -142,18 +142,13 @@ fun ScreenTimerScreen(onBack: () -> Unit) {
 }
 
 @Composable
-fun TodayTab(database: TimerDatabase) {
+fun TodayTab(database: TimerDatabase, hasUsageAccess: Boolean) {
     val todayDate = remember { LocalDate.now().format(dayFormatter) }
     val summaryFlow = remember(todayDate) { database.screenTimeDao().getDailySummaryFlow(todayDate) }
     val summary by summaryFlow.collectAsState(initial = null)
     
     if (summary == null) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator()
-        }
+        EmptyScreenTimeState(hasUsageAccess)
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -236,18 +231,18 @@ fun TodayTab(database: TimerDatabase) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     QuickStatCard(
-                        icon = Icons.Default.DirectionsWalk,
-                        label = "While Walking",
-                        value = ScreenTimeAnalytics.formatShortDuration(summary?.walkingScreenTimeSeconds ?: 0),
-                        modifier = Modifier.weight(1f),
-                        color = Color(0xFFFF9800)
-                    )
-                    QuickStatCard(
                         icon = Icons.Default.Timer,
                         label = "Longest",
                         value = ScreenTimeAnalytics.formatShortDuration(summary?.longestSessionSeconds ?: 0),
                         modifier = Modifier.weight(1f),
                         color = Color(0xFFE91E63)
+                    )
+                    QuickStatCard(
+                        icon = Icons.Default.History,
+                        label = "Shortest",
+                        value = ScreenTimeAnalytics.formatShortDuration(summary?.shortestSessionSeconds ?: 0),
+                        modifier = Modifier.weight(1f),
+                        color = Color(0xFFFF9800)
                     )
                 }
             }
@@ -333,7 +328,7 @@ fun TodayTab(database: TimerDatabase) {
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Data is automatically tracked using Android system APIs. Screen time is measured when your screen is on.",
+                            text = "Data comes from Android's digital wellbeing usage stats. Grant usage access to keep the numbers fresh even when the app is closed.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
@@ -350,7 +345,9 @@ fun TodayTab(database: TimerDatabase) {
 
 @Composable
 private fun PermissionNotice(onGrant: () -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+    Card(modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp, vertical = 12.dp)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -374,6 +371,43 @@ private fun PermissionNotice(onGrant: () -> Unit) {
             Button(onClick = onGrant) {
                 Text("Open Settings")
             }
+        }
+    }
+}
+
+@Composable
+private fun EmptyScreenTimeState(hasUsageAccess: Boolean) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.PhoneDisabled,
+                contentDescription = null,
+                modifier = Modifier.size(72.dp),
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+            )
+            Text(
+                text = if (hasUsageAccess) "No screen time recorded yet" else "Usage access required",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = if (hasUsageAccess) {
+                    "Unlock your device and use it for a bit. We’ll pull in new data automatically."
+                } else {
+                    "Grant usage access in settings so we can track screen time, even when the app is closed."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -726,16 +760,13 @@ fun SessionCard(session: me.aliahad.timemanager.data.ScreenTimeSession) {
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(
-                        if (session.wasWalking) Color(0xFFFF9800).copy(alpha = 0.2f)
-                        else MaterialTheme.colorScheme.primaryContainer
-                    ),
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    if (session.wasWalking) Icons.Default.DirectionsWalk else Icons.Default.PhoneAndroid,
+                    imageVector = Icons.Default.PhoneAndroid,
                     contentDescription = null,
-                    tint = if (session.wasWalking) Color(0xFFFF9800) else MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
             
@@ -748,7 +779,7 @@ fun SessionCard(session: me.aliahad.timemanager.data.ScreenTimeSession) {
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = if (session.wasWalking) "While walking" else "Screen session",
+                    text = "Screen session",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )

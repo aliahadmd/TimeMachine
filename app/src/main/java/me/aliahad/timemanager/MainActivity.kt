@@ -10,9 +10,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import me.aliahad.timemanager.ui.theme.TimeManagerTheme
 
@@ -56,11 +61,20 @@ class MainActivity : ComponentActivity() {
         ScreenTimeScheduler.ensurePeriodicWork(this)
         ScreenTimeScheduler.triggerImmediateSync(this)
         
+        val tutorialPrefs = getSharedPreferences("onboarding", Context.MODE_PRIVATE)
+        val hasSeenTutorial = tutorialPrefs.getBoolean("tutorial_seen", false)
         enableEdgeToEdge()
         setContent {
             TimeManagerTheme {
+                var showTutorial by remember { mutableStateOf(!hasSeenTutorial) }
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    TimeMachineNavigation()
+                    Box {
+                        TimeMachineNavigation()
+                        TutorialModal(visible = showTutorial) {
+                            tutorialPrefs.edit().putBoolean("tutorial_seen", true).apply()
+                            showTutorial = false
+                        }
+                    }
                 }
             }
         }

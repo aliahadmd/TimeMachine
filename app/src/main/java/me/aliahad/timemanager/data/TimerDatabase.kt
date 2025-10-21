@@ -5,6 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -24,7 +26,7 @@ import androidx.room.TypeConverters
         ScreenTimeDailySummary::class,
         ScreenTimeHourly::class
     ],
-    version = 12,  // Added Screen Time tracking
+    version = 13,  // Added screen time indices
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -46,6 +48,20 @@ abstract class TimerDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: TimerDatabase? = null
         
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Remove duplicate screen sessions before enforcing unique index
+                database.execSQL(
+                    "DELETE FROM screen_time_sessions WHERE rowid NOT IN (" +
+                        "SELECT MIN(rowid) FROM screen_time_sessions GROUP BY sessionStart" +
+                        ")"
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_screen_time_sessions_sessionStart ON screen_time_sessions(sessionStart)"
+                )
+            }
+        }
+        
             fun getDatabase(context: Context): TimerDatabase {
                 return INSTANCE ?: synchronized(this) {
                     val instance = Room.databaseBuilder(
@@ -53,9 +69,7 @@ abstract class TimerDatabase : RoomDatabase() {
                         TimerDatabase::class.java,
                         "timer_database"
                     )
-                    // Production: Proper migrations would be added here for schema changes
-                    // For now, app is in initial release so destructive migration is acceptable
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_12_13)
                     .build()
                     INSTANCE = instance
                     instance
@@ -63,4 +77,3 @@ abstract class TimerDatabase : RoomDatabase() {
             }
     }
 }
-

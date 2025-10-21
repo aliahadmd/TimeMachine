@@ -146,7 +146,9 @@ class ScreenTimeWorker(
             wasWalking = false,
             appUsed = null
         )
-        dao.insertSession(session)
+        if (!dao.hasSession(session.sessionStart)) {
+            dao.insertSession(session)
+        }
     }
     
     private suspend fun updateDailySummary(

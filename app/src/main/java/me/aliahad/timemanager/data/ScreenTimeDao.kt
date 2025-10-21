@@ -18,6 +18,9 @@ interface ScreenTimeDao {
     @Query("SELECT * FROM screen_time_sessions ORDER BY timestamp DESC LIMIT :limit")
     fun getRecentSessions(limit: Int): Flow<List<ScreenTimeSession>>
     
+    @Query("SELECT EXISTS(SELECT 1 FROM screen_time_sessions WHERE sessionStart = :sessionStart)")
+    suspend fun hasSession(sessionStart: Long): Boolean
+    
     // Daily summary operations
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDailySummary(summary: ScreenTimeDailySummary)
@@ -73,4 +76,3 @@ data class DailyTrend(
     val date: String,
     val totalScreenTimeSeconds: Int
 )
-
