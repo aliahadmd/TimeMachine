@@ -38,8 +38,8 @@ object ExpenseAnalytics {
     }
     
     // Format currency
-    fun formatCurrency(amount: Double): String {
-        return "৳%.2f".format(abs(amount))
+    fun formatCurrency(amount: Double, currency: String = "৳"): String {
+        return "$currency%.2f".format(abs(amount))
     }
     
     // Calculate category spending

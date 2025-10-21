@@ -220,6 +220,10 @@ fun TimerBlockCard(
     val lifecycleOwner = LocalLifecycleOwner.current
     val database = remember { me.aliahad.timemanager.data.TimerDatabase.getDatabase(context) }
     
+    // Get user's currency preference
+    val userProfile by database.userProfileDao().getProfile().collectAsState(initial = null)
+    val currency = userProfile?.currency ?: "৳"
+    
     // For Focus Timer, get today's tracked time
     var todayMinutes by remember { mutableIntStateOf(0) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
@@ -469,7 +473,7 @@ fun TimerBlockCard(
                 )
             } else if (block.type == TimerBlockType.EXPENSE_TRACKER) {
                 Text(
-                    text = ExpenseAnalytics.formatCurrency(todayExpenses),
+                    text = ExpenseAnalytics.formatCurrency(todayExpenses, currency),
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 28.sp

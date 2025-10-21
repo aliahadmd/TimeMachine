@@ -50,6 +50,10 @@ fun ExpenseTrackerScreen(onBack: () -> Unit) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     
+    // Get user's currency preference
+    val userProfile by database.userProfileDao().getProfile().collectAsState(initial = null)
+    val currency = userProfile?.currency ?: "৳"
+    
     // Initialize default categories on first launch
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -130,14 +134,16 @@ fun ExpenseTrackerScreen(onBack: () -> Unit) {
                 0 -> AddExpenseTab(
                     database = database,
                     refreshTrigger = refreshTrigger,
-                    onRefresh = { refreshTrigger++ }
+                    onRefresh = { refreshTrigger++ },
+                    currency = currency
                 )
-                1 -> ExpenseListTab(database = database, refreshTrigger = refreshTrigger)
-                2 -> StatsTab(database = database, refreshTrigger = refreshTrigger)
+                1 -> ExpenseListTab(database = database, refreshTrigger = refreshTrigger, currency = currency)
+                2 -> StatsTab(database = database, refreshTrigger = refreshTrigger, currency = currency)
                 3 -> CategoriesTab(
                     database = database,
                     refreshTrigger = refreshTrigger,
-                    onRefresh = { refreshTrigger++ }
+                    onRefresh = { refreshTrigger++ },
+                    currency = currency
                 )
             }
         }
@@ -148,7 +154,8 @@ fun ExpenseTrackerScreen(onBack: () -> Unit) {
 fun AddExpenseTab(
     database: TimerDatabase,
     refreshTrigger: Int,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    currency: String
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -202,7 +209,7 @@ fun AddExpenseTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "৳",
+                            text = currency,
                             style = MaterialTheme.typography.headlineLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -529,7 +536,8 @@ fun CategoryChip(
 fun CategoriesTab(
     database: TimerDatabase,
     refreshTrigger: Int,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    currency: String
 ) {
     val scope = rememberCoroutineScope()
     val categories by database.expenseCategoryDao().getAllCategories()
@@ -581,7 +589,8 @@ fun CategoriesTab(
                         onDelete = {
                             categoryToDelete = category
                             showDeleteDialog = true
-                        }
+                        },
+                        currency = currency
                     )
                 }
                 
@@ -679,7 +688,8 @@ fun CategoriesTab(
 fun CategoryItem(
     category: ExpenseCategory,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    currency: String
 ) {
     val color = Color(category.color)
     
@@ -718,7 +728,7 @@ fun CategoryItem(
                 )
                 if (category.budget > 0) {
                     Text(
-                        text = "Budget: ${ExpenseAnalytics.formatCurrency(category.budget)}",
+                        text = "Budget: ${ExpenseAnalytics.formatCurrency(category.budget, currency)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -894,7 +904,7 @@ fun ExpenseCategoryDialog(
 }
 
 @Composable
-fun ExpenseListTab(database: TimerDatabase, refreshTrigger: Int) {
+fun ExpenseListTab(database: TimerDatabase, refreshTrigger: Int, currency: String) {
     val expenses by database.expenseDao().getAllExpenses().collectAsState(initial = emptyList())
     val categories by database.expenseCategoryDao().getAllCategories().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -966,7 +976,7 @@ fun ExpenseListTab(database: TimerDatabase, refreshTrigger: Int) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = ExpenseAnalytics.formatCurrency(totalAmount),
+                    text = ExpenseAnalytics.formatCurrency(totalAmount, currency),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -1034,7 +1044,8 @@ fun ExpenseListTab(database: TimerDatabase, refreshTrigger: Int) {
                             onDelete = {
                                 expenseToDelete = expense
                                 showDeleteDialog = true
-                            }
+                            },
+                            currency = currency
                         )
                     }
                 }
@@ -1082,7 +1093,8 @@ fun ExpenseListTab(database: TimerDatabase, refreshTrigger: Int) {
 fun ExpenseItem(
     expense: Expense,
     category: ExpenseCategory?,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    currency: String
 ) {
     val color = category?.let { Color(it.color) } ?: MaterialTheme.colorScheme.secondary
     
@@ -1140,7 +1152,7 @@ fun ExpenseItem(
             // Amount and Delete
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = ExpenseAnalytics.formatCurrency(expense.amount),
+                    text = ExpenseAnalytics.formatCurrency(expense.amount, currency),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -1162,7 +1174,7 @@ fun ExpenseItem(
 }
 
 @Composable
-fun StatsTab(database: TimerDatabase, refreshTrigger: Int) {
+fun StatsTab(database: TimerDatabase, refreshTrigger: Int, currency: String) {
     val expenses by database.expenseDao().getAllExpenses().collectAsState(initial = emptyList())
     val categories by database.expenseCategoryDao().getAllCategories().collectAsState(initial = emptyList())
     
@@ -1242,7 +1254,7 @@ fun StatsTab(database: TimerDatabase, refreshTrigger: Int) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = ExpenseAnalytics.formatCurrency(stats.totalExpenses),
+                        text = ExpenseAnalytics.formatCurrency(stats.totalExpenses, currency),
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -1263,12 +1275,12 @@ fun StatsTab(database: TimerDatabase, refreshTrigger: Int) {
             ) {
                 StatCard(
                     title = "Daily Avg",
-                    value = ExpenseAnalytics.formatCurrency(stats.averagePerDay),
+                    value = ExpenseAnalytics.formatCurrency(stats.averagePerDay, currency),
                     modifier = Modifier.weight(1f)
                 )
                 StatCard(
                     title = "Per Transaction",
-                    value = ExpenseAnalytics.formatCurrency(stats.averagePerTransaction),
+                    value = ExpenseAnalytics.formatCurrency(stats.averagePerTransaction, currency),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -1277,7 +1289,7 @@ fun StatsTab(database: TimerDatabase, refreshTrigger: Int) {
         item {
             StatCard(
                 title = "Highest Expense",
-                value = ExpenseAnalytics.formatCurrency(stats.highestExpense),
+                value = ExpenseAnalytics.formatCurrency(stats.highestExpense, currency),
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -1293,7 +1305,7 @@ fun StatsTab(database: TimerDatabase, refreshTrigger: Int) {
             }
             
             items(categorySpending) { spending ->
-                CategorySpendingItem(spending = spending)
+                CategorySpendingItem(spending = spending, currency = currency)
             }
         } else {
             item {
@@ -1369,7 +1381,7 @@ fun StatCard(
 }
 
 @Composable
-fun CategorySpendingItem(spending: ExpenseAnalytics.CategorySpending) {
+fun CategorySpendingItem(spending: ExpenseAnalytics.CategorySpending, currency: String) {
     val color = Color(spending.category.color)
     
     Card(
@@ -1414,7 +1426,7 @@ fun CategorySpendingItem(spending: ExpenseAnalytics.CategorySpending) {
                 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = ExpenseAnalytics.formatCurrency(spending.total),
+                        text = ExpenseAnalytics.formatCurrency(spending.total, currency),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary

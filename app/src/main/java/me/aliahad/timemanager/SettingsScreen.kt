@@ -38,10 +38,21 @@ fun SettingsScreen(onBack: () -> Unit) {
     var showImportDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
+    var showCurrencyDialog by remember { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
     var isImporting by remember { mutableStateOf(false) }
     var isClearing by remember { mutableStateOf(false) }
     var operationMessage by remember { mutableStateOf<Pair<String, Boolean>?>(null) } // Message, isSuccess
+    
+    // Load user profile for currency setting
+    val userProfile by database.userProfileDao().getProfile().collectAsState(initial = null)
+    var selectedCurrency by remember { mutableStateOf("৳") }
+    
+    LaunchedEffect(userProfile) {
+        userProfile?.let { profile ->
+            selectedCurrency = profile.currency
+        }
+    }
     
     // File picker for export (create document)
     val exportLauncher = rememberLauncherForActivityResult(
@@ -121,6 +132,27 @@ fun SettingsScreen(onBack: () -> Unit) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Section: General Settings
+            item {
+                Text(
+                    text = "General Settings",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+            
+            item {
+                SettingsCard(
+                    icon = Icons.Default.AttachMoney,
+                    title = "Currency",
+                    subtitle = "Current: $selectedCurrency",
+                    iconColor = Color(0xFFFFB74D),
+                    onClick = { showCurrencyDialog = true }
+                )
+            }
+            
             // Section: Data Management
             item {
                 Text(
@@ -128,7 +160,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
                 )
             }
             
@@ -322,6 +354,34 @@ fun SettingsScreen(onBack: () -> Unit) {
     // About Dialog
     if (showAboutDialog) {
         AboutDialog(onDismiss = { showAboutDialog = false })
+    }
+    
+    // Currency Selection Dialog
+    if (showCurrencyDialog) {
+        CurrencyDialog(
+            currentCurrency = selectedCurrency,
+            onDismiss = { showCurrencyDialog = false },
+            onCurrencySelected = { newCurrency ->
+                showCurrencyDialog = false
+                scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            userProfile?.let { profile ->
+                                val updatedProfile = profile.copy(
+                                    currency = newCurrency,
+                                    updatedAt = System.currentTimeMillis()
+                                )
+                                database.userProfileDao().updateProfile(updatedProfile)
+                            }
+                        }
+                        selectedCurrency = newCurrency
+                        operationMessage = "✅ Currency updated to $newCurrency" to true
+                    } catch (e: Exception) {
+                        operationMessage = "❌ Failed to update currency: ${e.message}" to false
+                    }
+                }
+            }
+        )
     }
 }
 
@@ -737,6 +797,149 @@ fun AboutDialog(onDismiss: () -> Unit) {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Close")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CurrencyDialog(
+    currentCurrency: String,
+    onDismiss: () -> Unit,
+    onCurrencySelected: (String) -> Unit
+) {
+    // Define available currencies with their symbols and names
+    data class Currency(val symbol: String, val code: String, val name: String)
+    
+    val currencies = listOf(
+        Currency("৳", "BDT", "Bangladeshi Taka"),
+        Currency("$", "USD", "US Dollar"),
+        Currency("€", "EUR", "Euro"),
+        Currency("£", "GBP", "British Pound"),
+        Currency("¥", "CNY", "Chinese Yuan / RMB"),
+        Currency("₹", "INR", "Indian Rupee"),
+        Currency("¥", "JPY", "Japanese Yen"),
+        Currency("₩", "KRW", "South Korean Won"),
+        Currency("₽", "RUB", "Russian Ruble"),
+        Currency("R$", "BRL", "Brazilian Real"),
+        Currency("C$", "CAD", "Canadian Dollar"),
+        Currency("A$", "AUD", "Australian Dollar"),
+        Currency("CHF", "CHF", "Swiss Franc"),
+        Currency("kr", "SEK", "Swedish Krona"),
+        Currency("zł", "PLN", "Polish Zloty")
+    )
+    
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 600.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            LazyColumn(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Select Currency",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Used in Expense & Subscription Tracker",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+                
+                item {
+                    HorizontalDivider()
+                }
+                
+                items(currencies.size) { index ->
+                    val currency = currencies[index]
+                    val isSelected = currency.symbol == currentCurrency
+                    
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onCurrencySelected(currency.symbol)
+                            },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelected) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surface
+                            }
+                        ),
+                        elevation = CardDefaults.cardElevation(
+                            defaultElevation = if (isSelected) 4.dp else 1.dp
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = currency.symbol,
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Column {
+                                    Text(
+                                        text = currency.code,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = currency.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                }
+                            }
+                            
+                            if (isSelected) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = "Selected",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                item {
+                    HorizontalDivider()
+                }
+                
+                item {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cancel")
                     }
                 }
             }
