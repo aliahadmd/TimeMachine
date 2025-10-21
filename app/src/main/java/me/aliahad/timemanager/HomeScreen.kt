@@ -300,6 +300,23 @@ fun TimerBlockCard(
         }
     }
     
+    // For Daily Planner, get today's task count
+    var todayTaskCount by remember { mutableIntStateOf(0) }
+    var todayCompletedCount by remember { mutableIntStateOf(0) }
+    
+    if (block.type == TimerBlockType.DAILY_PLANNER) {
+        LaunchedEffect(refreshTrigger) {
+            while (true) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val todayDate = DailyPlannerUtils.getTodayDateString()
+                    todayTaskCount = database.dailyTaskDao().getTaskCountForDate(todayDate)
+                    todayCompletedCount = database.dailyTaskDao().getCompletedCountForDate(todayDate)
+                }
+                kotlinx.coroutines.delay(5000)
+            }
+        }
+    }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -458,6 +475,22 @@ fun TimerBlockCard(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
+            } else if (block.type == TimerBlockType.DAILY_PLANNER) {
+                Text(
+                    text = "$todayCompletedCount/$todayTaskCount",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 32.sp
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "tasks completed",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
             } else {
                 Text(
                     text = "0:00",
@@ -487,7 +520,8 @@ enum class TimerBlockType {
     YEAR_CALCULATOR,
     BMI_CALCULATOR,
     EXPENSE_TRACKER,
-    SUBSCRIPTION_TRACKER
+    SUBSCRIPTION_TRACKER,
+    DAILY_PLANNER
 }
 
 // Get available timer blocks with varied colors
@@ -528,6 +562,12 @@ fun getTimerBlocks(): List<TimerBlock> {
             title = "Subscription Tracker",
             icon = Icons.Default.Subscriptions,
             baseColor = Color(0xFF20C997) // Vibrant Teal
+        ),
+        TimerBlock(
+            type = TimerBlockType.DAILY_PLANNER,
+            title = "Daily Planner",
+            icon = Icons.Default.EditCalendar,
+            baseColor = Color(0xFF6C63FF) // Vibrant Indigo
         )
     )
 }
