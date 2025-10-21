@@ -616,9 +616,9 @@ enum class TimerBlockType {
     EXPENSE_TRACKER,
     SUBSCRIPTION_TRACKER,
     DAILY_PLANNER,
+    SCREEN_TIMER,
     PROFILE,
-    SETTINGS,
-    SCREEN_TIMER
+    SETTINGS
 }
 
 // Get available timer blocks with varied colors
@@ -667,6 +667,12 @@ fun getTimerBlocks(): List<TimerBlock> {
             baseColor = Color(0xFF6C63FF) // Vibrant Indigo
         ),
         TimerBlock(
+            type = TimerBlockType.SCREEN_TIMER,
+            title = "Screen Timer",
+            icon = Icons.Default.PhoneAndroid,
+            baseColor = Color(0xFF00BCD4) // Vibrant Cyan
+        ),
+        TimerBlock(
             type = TimerBlockType.PROFILE,
             title = "Profile",
             icon = Icons.Default.Person,
@@ -677,12 +683,6 @@ fun getTimerBlocks(): List<TimerBlock> {
             title = "Settings",
             icon = Icons.Default.Settings,
             baseColor = Color(0xFF607D8B) // Vibrant Blue Grey
-        ),
-        TimerBlock(
-            type = TimerBlockType.SCREEN_TIMER,
-            title = "Screen Timer",
-            icon = Icons.Default.PhoneAndroid,
-            baseColor = Color(0xFF00BCD4) // Vibrant Cyan
         )
     )
 }
