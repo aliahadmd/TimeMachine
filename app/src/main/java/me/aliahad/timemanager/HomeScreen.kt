@@ -317,6 +317,31 @@ fun TimerBlockCard(
         }
     }
     
+    // For Profile, get username
+    var userName by remember { mutableStateOf("User") }
+    
+    if (block.type == TimerBlockType.PROFILE) {
+        val profile by database.userProfileDao().getProfile().collectAsState(initial = null)
+        userName = profile?.name ?: "User"
+    }
+    
+    // For Settings, check for warnings/status
+    var settingsWarning by remember { mutableStateOf("") }
+    
+    if (block.type == TimerBlockType.SETTINGS) {
+        LaunchedEffect(refreshTrigger) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                // Check if profile exists
+                val profileCount = database.userProfileDao().getProfileCount()
+                settingsWarning = if (profileCount == 0) {
+                    "⚠️ Setup needed"
+                } else {
+                    "All configured"
+                }
+            }
+        }
+    }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -491,14 +516,50 @@ fun TimerBlockCard(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
-            } else {
+            } else if (block.type == TimerBlockType.PROFILE) {
                 Text(
-                    text = "0:00",
+                    text = userName,
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 24.sp
                     ),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+                Text(
+                    text = "Your Profile",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
+            } else if (block.type == TimerBlockType.SETTINGS) {
+                Text(
+                    text = settingsWarning,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = if (settingsWarning.contains("⚠️")) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 16.sp
+                    ),
+                    color = if (settingsWarning.contains("⚠️")) {
+                        Color(0xFFFF9800)
+                    } else {
+                        Color(0xFF4CAF50)
+                    },
+                    textAlign = TextAlign.Center,
+                    maxLines = 2
+                )
+                Text(
+                    text = "App Settings",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                // Fallback for any future block types
+                Text(
+                    text = "Tap to open",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
             }
