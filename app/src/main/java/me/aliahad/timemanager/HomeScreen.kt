@@ -522,7 +522,8 @@ enum class TimerBlockType {
     EXPENSE_TRACKER,
     SUBSCRIPTION_TRACKER,
     DAILY_PLANNER,
-    PROFILE
+    PROFILE,
+    SETTINGS
 }
 
 // Get available timer blocks with varied colors
@@ -575,6 +576,12 @@ fun getTimerBlocks(): List<TimerBlock> {
             title = "Profile",
             icon = Icons.Default.Person,
             baseColor = Color(0xFFE91E63) // Vibrant Pink
+        ),
+        TimerBlock(
+            type = TimerBlockType.SETTINGS,
+            title = "Settings",
+            icon = Icons.Default.Settings,
+            baseColor = Color(0xFF607D8B) // Vibrant Blue Grey
         )
     )
 }

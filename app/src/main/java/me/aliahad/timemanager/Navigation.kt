@@ -25,6 +25,7 @@ fun TimeMachineNavigation() {
                         TimerBlockType.SUBSCRIPTION_TRACKER -> navController.navigate("subscription_tracker")
                         TimerBlockType.DAILY_PLANNER -> navController.navigate("daily_planner")
                         TimerBlockType.PROFILE -> navController.navigate("profile")
+                        TimerBlockType.SETTINGS -> navController.navigate("settings")
                     }
                 }
             )
@@ -60,6 +61,10 @@ fun TimeMachineNavigation() {
         
         composable("profile") {
             ProfileScreen(onBack = { navController.popBackStack() })
+        }
+        
+        composable("settings") {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }
