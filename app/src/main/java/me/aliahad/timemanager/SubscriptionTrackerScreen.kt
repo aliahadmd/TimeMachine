@@ -577,7 +577,7 @@ fun SubscriptionDialog(
                             label = { Text("Cost *") },
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            leadingIcon = { Text("৳") },
+                            leadingIcon = { Text(currency) },
                             singleLine = true
                         )
                         
@@ -1064,14 +1064,14 @@ fun SubscriptionStatsTab(database: TimerDatabase, refreshTrigger: Int, currency:
             ) {
                 StatCard(
                     title = "Monthly Total",
-                    value = SubscriptionAnalytics.formatCurrency(stats.totalMonthly),
+                    value = SubscriptionAnalytics.formatCurrency(stats.totalMonthly, currency),
                     icon = Icons.Default.CalendarMonth,
                     color = Color(0xFF51CF66),
                     modifier = Modifier.weight(1f)
                 )
                 StatCard(
                     title = "Yearly Total",
-                    value = SubscriptionAnalytics.formatCurrency(stats.totalYearly),
+                    value = SubscriptionAnalytics.formatCurrency(stats.totalYearly, currency),
                     icon = Icons.Default.CalendarViewMonth,
                     color = Color(0xFFFF6B6B),
                     modifier = Modifier.weight(1f)
@@ -1092,7 +1092,7 @@ fun SubscriptionStatsTab(database: TimerDatabase, refreshTrigger: Int, currency:
                 )
                 InfoCard(
                     title = "Avg/Sub",
-                    value = SubscriptionAnalytics.formatCurrency(stats.avgCostPerSub),
+                    value = SubscriptionAnalytics.formatCurrency(stats.avgCostPerSub, currency),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -1127,7 +1127,7 @@ fun SubscriptionStatsTab(database: TimerDatabase, refreshTrigger: Int, currency:
             }
             
             items(categorySpending) { spending ->
-                CategorySpendingCard(spending = spending)
+                CategorySpendingCard(spending = spending, currency = currency)
             }
         }
         
@@ -1205,7 +1205,7 @@ fun InfoCard(
 }
 
 @Composable
-fun CategorySpendingCard(spending: SubscriptionAnalytics.CategorySpending) {
+fun CategorySpendingCard(spending: SubscriptionAnalytics.CategorySpending, currency: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -1243,7 +1243,7 @@ fun CategorySpendingCard(spending: SubscriptionAnalytics.CategorySpending) {
                 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = SubscriptionAnalytics.formatCurrency(spending.monthlyTotal),
+                        text = SubscriptionAnalytics.formatCurrency(spending.monthlyTotal, currency),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
