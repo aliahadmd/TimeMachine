@@ -273,6 +273,20 @@ fun TimerBlockCard(
         bmiCount = bmiCalculations.size
     }
     
+    // For Expense Tracker, get today's total expenses
+    var todayExpenses by remember { mutableStateOf(0.0) }
+    
+    if (block.type == TimerBlockType.EXPENSE_TRACKER) {
+        LaunchedEffect(refreshTrigger) {
+            while (true) {
+                val today = ExpenseAnalytics.getTodayDateString()
+                val total = database.expenseDao().getTotalForDate(today) ?: 0.0
+                todayExpenses = total
+                kotlinx.coroutines.delay(5000)
+            }
+        }
+    }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -398,6 +412,23 @@ fun TimerBlockCard(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
+            } else if (block.type == TimerBlockType.EXPENSE_TRACKER) {
+                Text(
+                    text = ExpenseAnalytics.formatCurrency(todayExpenses),
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 28.sp
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+                Text(
+                    text = "spent today",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
             } else {
                 Text(
                     text = "0:00",
@@ -425,7 +456,8 @@ enum class TimerBlockType {
     FOCUS_TIMER,
     HABIT_TRACKER,
     YEAR_CALCULATOR,
-    BMI_CALCULATOR
+    BMI_CALCULATOR,
+    EXPENSE_TRACKER
 }
 
 // Get available timer blocks with varied colors
@@ -454,6 +486,12 @@ fun getTimerBlocks(): List<TimerBlock> {
             title = "BMI Calculator",
             icon = Icons.Default.FitnessCenter,
             baseColor = Color(0xFFAB47BC) // Vibrant Purple
+        ),
+        TimerBlock(
+            type = TimerBlockType.EXPENSE_TRACKER,
+            title = "Expense Tracker",
+            icon = Icons.Default.AccountBalanceWallet,
+            baseColor = Color(0xFFFFAB40) // Vibrant Orange
         )
     )
 }

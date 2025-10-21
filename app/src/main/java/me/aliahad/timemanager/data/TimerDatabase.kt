@@ -13,9 +13,11 @@ import androidx.room.RoomDatabase
         DateCalculation::class, 
         BMICalculation::class,
         ActivityCategory::class,
-        TimeSession::class
+        TimeSession::class,
+        Expense::class,
+        ExpenseCategory::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class TimerDatabase : RoomDatabase() {
@@ -25,6 +27,8 @@ abstract class TimerDatabase : RoomDatabase() {
     abstract fun bmiCalculationDao(): BMICalculationDao
     abstract fun activityCategoryDao(): ActivityCategoryDao
     abstract fun timeSessionDao(): TimeSessionDao
+    abstract fun expenseDao(): ExpenseDao
+    abstract fun expenseCategoryDao(): ExpenseCategoryDao
     
     companion object {
         @Volatile
