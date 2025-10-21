@@ -703,6 +703,35 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 }
                 
                 item {
+                    HorizontalDivider()
+                }
+                
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Developer",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Ali Ahad",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "🌐 aliahad.me",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "📧 ali@aliahad.me",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                
+                item {
                     Button(
                         onClick = onDismiss,
                         modifier = Modifier.fillMaxWidth()
