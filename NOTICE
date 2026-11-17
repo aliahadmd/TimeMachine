@@ -1,0 +1,31 @@
+TimeMachine
+https://github.com/LiLabsAI/TimeMachine
+
+Copyright (C) 2025-2026 Ali Ahad
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License, version 3, as published by the Free
+Software Foundation. See the LICENSE file at the root of this repository for the
+full license text.
+
+Ownership and Attribution:
+- Original copyright and authorship remain with Ali Ahad.
+- Under Sections 4, 5, and 7 of the GNU General Public License v3.0, any copy,
+  fork, modified version, or redistributed work containing TimeMachine source code
+  or derivatives must:
+  1. Keep intact all existing copyright notices, attribution notices, and the
+     LICENSE and NOTICE files.
+  2. Carry prominent notices stating any modifications and the date of change.
+  3. Be licensed as a whole under the GNU General Public License v3.0 to all
+     recipients — incorporation into closed-source proprietary distributions is
+     not permitted.
+
+Trademarks and Branding:
+- The GNU General Public License v3.0 applies to the software source code and
+  original project materials; it does not grant rights to use the trademarks,
+  logos, or service marks of LI Labs, TimeMachine, or aliahad.me to imply
+  endorsement.
+
+Third-Party Materials:
+- Third-party Android, Jetpack, Kotlin, and build dependencies remain subject to
+  their respective licenses and notices.

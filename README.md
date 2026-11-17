@@ -6,6 +6,7 @@
 ![Android](https://img.shields.io/badge/platform-Android-green.svg)
 ![Min API](https://img.shields.io/badge/API-31%2B-brightgreen.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-purple.svg)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 **A comprehensive productivity & health tracking app for Android built with Jetpack Compose**
 
@@ -261,7 +262,7 @@ Download `Focus TimerTimer-v1.0.1.apk` below and install on your Android device.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions, bug reports, forks, and pull requests are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for local build and test instructions.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
@@ -269,11 +270,21 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
+By contributing, you agree that your contributions will be licensed under the GNU General Public License v3.0 (`GPL-3.0`).
+
 ---
 
 ## 📄 License
 
-This project is open source and available under the [MIT License](LICENSE).
+Copyright (C) 2025-2026 Ali Ahad (LI Labs).
+
+**TimeMachine** is free and open-source software licensed under the **GNU General Public License v3.0 (`GPL-3.0`)**.
+
+- **Study, fork, and contribute:** You are free to study the code, fork this repository, modify it, build from source, and share improvements via pull requests on [GitHub](https://github.com/LiLabsAI/TimeMachine).
+- **Copyleft protection:** Any distributed modified version or derivative work must also be licensed under the **GNU General Public License v3.0** with full source availability. Incorporating TimeMachine code into distributed closed-source proprietary software is not permitted.
+- **Ownership & attribution:** Original authorship and copyright remain with **Ali Ahad**. Redistributions and forks must preserve original copyright notices, attribution notices, [LICENSE](LICENSE), and [NOTICE](NOTICE).
+
+See [LICENSE](LICENSE) for the full GNU GPLv3 text, [NOTICE](NOTICE) for attribution details, and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ---
 
