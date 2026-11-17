@@ -1,24 +1,16 @@
 package me.aliahad.timemanager
 
+import me.aliahad.timemanager.core.common.Formatters
 import me.aliahad.timemanager.data.*
-import kotlin.math.pow
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
-/**
- * Comprehensive BMI calculation utilities
- */
-
-/**
- * Calculate BMI from height (cm) and weight (kg)
- */
 fun calculateBMI(heightCm: Float, weightKg: Float): Float {
-    if (heightCm <= 0 || weightKg <= 0) return 0f
+    if (heightCm <= 0f || weightKg <= 0f) return 0f
     val heightM = heightCm / 100f
     return weightKg / (heightM * heightM)
 }
 
-/**
- * Get BMI category based on classification system
- */
 fun getBMICategory(
     bmi: Float,
     age: Int,
@@ -31,27 +23,42 @@ fun getBMICategory(
     }
 }
 
-/**
- * Get BMI category color
- */
-fun getBMICategoryColor(bmi: Float): Long {
-    return WHOBMICategory.fromBMI(bmi).color
+fun getBMICategoryColor(
+    bmi: Float,
+    age: Int = 30,
+    gender: Gender = Gender.MALE,
+    classification: BMIClassification = BMIClassification.WHO
+): Long {
+    return when (classification) {
+        BMIClassification.WHO -> WHOBMICategory.fromBMI(bmi).color
+        BMIClassification.DGE -> {
+            when (DGEClassification.getCategory(bmi, age, gender)) {
+                "Underweight" -> 0xFF42A5F5
+                "Normal" -> 0xFF4CAF50
+                "Overweight" -> 0xFFFFA726
+                else -> 0xFFE53935
+            }
+        }
+    }
 }
 
-/**
- * Calculate ideal weight range based on height and gender
- */
-fun getIdealWeightRange(heightCm: Float, gender: Gender): Pair<Float, Float> {
+fun getIdealWeightRange(
+    heightCm: Float,
+    gender: Gender,
+    age: Int = 30,
+    classification: BMIClassification = BMIClassification.WHO
+): Pair<Float, Float> {
     val heightM = heightCm / 100f
-    // Normal BMI range is 18.5 - 24.9
-    val minWeight = 18.5f * (heightM * heightM)
-    val maxWeight = 24.9f * (heightM * heightM)
-    return Pair(minWeight, maxWeight)
+    val (minBmi, maxBmi) = when (classification) {
+        BMIClassification.WHO -> 18.5f to 24.9f
+        BMIClassification.DGE -> {
+            val range = DGEClassification.getIdealRange(age, gender)
+            range.minBMI to range.maxBMI
+        }
+    }
+    return Pair(minBmi * (heightM * heightM), maxBmi * (heightM * heightM))
 }
 
-/**
- * Get detailed weight category table based on height
- */
 data class WeightCategory(
     val category: String,
     val minWeight: Float,
@@ -61,56 +68,48 @@ data class WeightCategory(
 
 fun getWeightCategoryTable(heightCm: Float): List<WeightCategory> {
     val heightM = heightCm / 100f
+    val sq = heightM * heightM
     return listOf(
-        WeightCategory(
-            "Underweight",
-            0f,
-            18.5f * (heightM * heightM),
-            0xFF42A5F5
-        ),
-        WeightCategory(
-            "Normal",
-            18.5f * (heightM * heightM),
-            24.9f * (heightM * heightM),
-            0xFF4CAF50
-        ),
-        WeightCategory(
-            "Overweight",
-            25f * (heightM * heightM),
-            29.9f * (heightM * heightM),
-            0xFFFFA726
-        ),
-        WeightCategory(
-            "Obese",
-            30f * (heightM * heightM),
-            Float.MAX_VALUE,
-            0xFFE53935
-        )
+        WeightCategory("Underweight", 0f, 18.5f * sq, 0xFF42A5F5),
+        WeightCategory("Normal", 18.5f * sq, 24.9f * sq, 0xFF4CAF50),
+        WeightCategory("Overweight", 25f * sq, 29.9f * sq, 0xFFFFA726),
+        WeightCategory("Obese", 30f * sq, Float.MAX_VALUE, 0xFFE53935)
     )
 }
 
-/**
- * Unit conversions
- */
-
-// Height conversions
 fun cmToFeet(cm: Float): Float = cm / 30.48f
 fun cmToInches(cm: Float): Float = cm / 2.54f
-fun feetAndInchesToCm(feet: Int, inches: Int): Float = (feet * 30.48f) + (inches * 2.54f)
 
-// Weight conversions
+fun cmToFeetAndInches(cm: Float): Pair<Int, Int> {
+    val totalInches = (cm / 2.54f).roundToInt().coerceAtLeast(0)
+    val feet = totalInches / 12
+    val inches = totalInches % 12
+    return feet to inches
+}
+
+fun feetAndInchesToCm(feet: Int, inches: Int): Float {
+    val raw = (feet * 30.48f) + (inches * 2.54f)
+    return raw.coerceIn(50f, 250f)
+}
+
 fun kgToLbs(kg: Float): Float = kg * 2.20462f
 fun lbsToKg(lbs: Float): Float = lbs / 2.20462f
 
-/**
- * Format BMI value
- */
-fun formatBMI(bmi: Float): String = String.format("%.1f", bmi)
+fun formatBMI(bmi: Float): String = Formatters.formatOneDecimal(bmi)
 
-/**
- * Get BMI interpretation message
- */
-fun getBMIInterpretation(bmi: Float, category: String): String {
+fun getBMIInterpretation(
+    bmi: Float,
+    category: String,
+    classification: BMIClassification = BMIClassification.WHO
+): String {
+    if (classification == BMIClassification.DGE) {
+        return when (category) {
+            "Underweight" -> "📉 Below your age/gender DGE reference range. Consider nutrient-dense foods."
+            "Normal" -> "✅ Within your age/gender DGE healthy weight range! Keep up the good work."
+            "Overweight" -> "📈 Above your age/gender DGE range. Consider balanced meals and regular activity."
+            else -> "⚠️ Significantly above your DGE range. Consult a healthcare professional for guidance."
+        }
+    }
     return when {
         bmi < 16 -> "⚠️ Severely underweight. Please consult a healthcare professional."
         bmi < 18.5 -> "📉 You're underweight. Consider increasing caloric intake with nutritious foods."
@@ -122,30 +121,24 @@ fun getBMIInterpretation(bmi: Float, category: String): String {
     }
 }
 
-/**
- * Calculate calories needed to reach target weight
- */
 fun getTargetWeightGuidance(currentWeight: Float, targetWeight: Float): String {
     val diff = currentWeight - targetWeight
     return when {
-        diff > 0 -> {
-            val weeks = (diff / 0.5f).toInt() // Safe weight loss: 0.5kg per week
-            "To reach your target weight, you need to lose ${String.format("%.1f", diff)} kg. " +
-                    "At a safe rate of 0.5kg/week, this will take approximately $weeks weeks."
+        diff > 0.05f -> {
+            val weeks = ceil(diff / 0.5f).toInt().coerceAtLeast(1)
+            "To reach your target weight, you need to lose ${Formatters.formatOneDecimal(diff)} kg. " +
+                "At a safe rate of 0.5kg/week, this will take approximately $weeks week(s)."
         }
-        diff < 0 -> {
+        diff < -0.05f -> {
             val gain = -diff
-            val weeks = (gain / 0.5f).toInt() // Safe weight gain: 0.5kg per week
-            "To reach your target weight, you need to gain ${String.format("%.1f", gain)} kg. " +
-                    "At a safe rate of 0.5kg/week, this will take approximately $weeks weeks."
+            val weeks = ceil(gain / 0.5f).toInt().coerceAtLeast(1)
+            "To reach your target weight, you need to gain ${Formatters.formatOneDecimal(gain)} kg. " +
+                "At a safe rate of 0.5kg/week, this will take approximately $weeks week(s)."
         }
         else -> "You're already at your target weight! 🎉"
     }
 }
 
-/**
- * Get health tips based on BMI category
- */
 fun getHealthTips(bmi: Float): List<String> {
     return when {
         bmi < 18.5 -> listOf(
@@ -175,9 +168,6 @@ fun getHealthTips(bmi: Float): List<String> {
     }
 }
 
-/**
- * Validate input values
- */
 data class BMIInputValidation(
     val isValid: Boolean,
     val errorMessage: String? = null
@@ -189,13 +179,12 @@ fun validateBMIInputs(
     weightKg: Float?
 ): BMIInputValidation {
     return when {
-        age == null || age < 2 || age > 120 -> 
+        age == null || age < 2 || age > 120 ->
             BMIInputValidation(false, "Age must be between 2 and 120 years")
-        heightCm == null || heightCm < 50 || heightCm > 250 -> 
+        heightCm == null || heightCm < 50f || heightCm > 250f ->
             BMIInputValidation(false, "Height must be between 50 and 250 cm")
-        weightKg == null || weightKg < 10 || weightKg > 300 -> 
+        weightKg == null || weightKg < 10f || weightKg > 300f ->
             BMIInputValidation(false, "Weight must be between 10 and 300 kg")
         else -> BMIInputValidation(true)
     }
 }
-

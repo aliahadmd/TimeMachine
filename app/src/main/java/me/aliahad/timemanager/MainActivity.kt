@@ -1,7 +1,6 @@
 package me.aliahad.timemanager
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -13,106 +12,127 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import me.aliahad.timemanager.core.datastore.UserPreferences
+import me.aliahad.timemanager.focus.FocusTimerService
+import me.aliahad.timemanager.notifications.FinanceAndDigestWorker
+import me.aliahad.timemanager.notifications.NotificationChannelRegistry
+import me.aliahad.timemanager.ui.navigation.FinanceRoute
+import me.aliahad.timemanager.ui.navigation.FocusRoute
+import me.aliahad.timemanager.ui.navigation.HabitDetailRoute
+import me.aliahad.timemanager.ui.navigation.PlannerRoute
+import me.aliahad.timemanager.ui.navigation.SettingsRoute
+import me.aliahad.timemanager.ui.navigation.TodayRoute
+import me.aliahad.timemanager.ui.navigation.WellbeingRoute
 import me.aliahad.timemanager.ui.theme.TimeManagerTheme
 
 class MainActivity : ComponentActivity() {
-    
-    private val requestPermissionLauncher = registerForActivityResult(
+
+    private var deepLinkState by mutableStateOf<DeepLinkRequest?>(null)
+
+    private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        // Handle permission result if needed
+    ) { _ ->
+        NotificationChannelRegistry.ensureChannels(this)
     }
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Request notification permission for Android 13+
+
+        NotificationChannelRegistry.ensureChannels(this)
+        ScreenTimeScheduler.ensurePeriodicWork(this)
+        ScreenTimeScheduler.triggerImmediateSync(this)
+        FinanceAndDigestWorker.ensureScheduled(this)
+
+        parseDeepLink(intent)?.let { deepLinkState = it }
+
+        enableEdgeToEdge()
+        val app = application as TimeManagerApp
+        lifecycleScope.launch {
+            FocusTimerService.restoreIfRunning(this@MainActivity, app.container.preferencesRepository)
+        }
+
+        setContent {
+            val prefs by app.container.preferencesRepository.preferencesFlow
+                .collectAsStateWithLifecycle(initialValue = UserPreferences())
+            val scope = rememberCoroutineScope()
+
+            TimeManagerTheme(
+                themeMode = prefs.themeMode,
+                dynamicColor = prefs.dynamicColor
+            ) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    Box {
+                        TimeMachineNavigation(deepLinkRequest = deepLinkState)
+                        TutorialModal(
+                            visible = !prefs.onboardingCompleted,
+                            onRequestNotifications = { requestNotificationsIfNeeded() },
+                            onDismiss = {
+                                scope.launch {
+                                    app.container.preferencesRepository.setOnboardingCompleted(true)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        parseDeepLink(intent)?.let { deepLinkState = it }
+    }
+
+    private fun requestNotificationsIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.POST_NOTIFICATIONS
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
-                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                return
             }
         }
-        
-        // Check exact alarm permission for Android 12+ (but don't launch settings immediately)
-        // This permission is needed for habit reminders to work precisely
-        // The app will show an in-app prompt when user tries to set a reminder
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
-            if (!alarmManager.canScheduleExactAlarms()) {
-                // Log for debugging - actual permission request happens in NotificationScheduler
-                android.util.Log.d("MainActivity", "Exact alarm permission not granted - will prompt when needed")
-            }
-        }
-        
-        // Create reminder notification channel
-        createReminderNotificationChannel()
-        
-        // Schedule Screen Time tracking work
-        ScreenTimeScheduler.ensurePeriodicWork(this)
-        ScreenTimeScheduler.triggerImmediateSync(this)
-        
-        val tutorialPrefs = getSharedPreferences("onboarding", Context.MODE_PRIVATE)
-        val hasSeenTutorial = tutorialPrefs.getBoolean("tutorial_seen", false)
-        enableEdgeToEdge()
-        setContent {
-            TimeManagerTheme {
-                var showTutorial by remember { mutableStateOf(!hasSeenTutorial) }
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    Box {
-                        TimeMachineNavigation()
-                        TutorialModal(visible = showTutorial) {
-                            tutorialPrefs.edit().putBoolean("tutorial_seen", true).apply()
-                            showTutorial = false
-                        }
-                    }
-                }
-            }
-        }
+        NotificationSettingsHelper.openNotificationSettings(this)
     }
-    
-    private fun createReminderNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Use system default notification sound
-            val reminderSound = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
-            
-            val audioAttributes = android.media.AudioAttributes.Builder()
-                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
-                .build()
-            
-            val channel = android.app.NotificationChannel(
-                "HabitReminderChannel",
-                "Habit Reminders",
-                android.app.NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Daily reminders for your habits - IMPORTANT: Enable sound and vibration"
-                enableVibration(true)
-                vibrationPattern = longArrayOf(0, 250, 250, 250)
-                enableLights(true)
-                lightColor = android.graphics.Color.GREEN
-                setSound(reminderSound, audioAttributes)
-                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                setShowBadge(true)
-            }
-            
-            val notificationManager = getSystemService(android.app.NotificationManager::class.java)
-            notificationManager?.createNotificationChannel(channel)
+
+    private fun parseDeepLink(intent: Intent?): DeepLinkRequest? {
+        if (intent == null) return null
+        val routeTarget = intent.getStringExtra(NotificationChannelRegistry.EXTRA_ROUTE_TARGET)
+        val habitId = intent.getLongExtra(NotificationChannelRegistry.EXTRA_OPEN_HABIT_ID, -1L)
+        val initialTab = intent.getIntExtra(NotificationChannelRegistry.EXTRA_INITIAL_TAB, 0)
+        val openDate = intent.getStringExtra(NotificationChannelRegistry.EXTRA_OPEN_DATE)
+        val catId = intent.getLongExtra(NotificationChannelRegistry.EXTRA_CATEGORY_ID, 0L)
+            .takeIf { it > 0L }
+        val taskId = intent.getLongExtra(NotificationChannelRegistry.EXTRA_TASK_ID, 0L)
+            .takeIf { it > 0L }
+        val autoStart = intent.getBooleanExtra(NotificationChannelRegistry.EXTRA_AUTO_START_FOCUS, false)
+
+        val route: Any? = when (routeTarget) {
+            NotificationChannelRegistry.ROUTE_TODAY -> TodayRoute
+            NotificationChannelRegistry.ROUTE_PLANNER -> PlannerRoute(openDate = openDate)
+            NotificationChannelRegistry.ROUTE_FOCUS -> FocusRoute(
+                categoryId = catId,
+                taskId = taskId,
+                autoStart = autoStart
+            )
+            NotificationChannelRegistry.ROUTE_FINANCE -> FinanceRoute(initialTab = initialTab)
+            NotificationChannelRegistry.ROUTE_WELLBEING -> WellbeingRoute(initialTab = initialTab)
+            NotificationChannelRegistry.ROUTE_HABIT_DETAIL -> if (habitId > 0L) HabitDetailRoute(habitId) else WellbeingRoute(0)
+            NotificationChannelRegistry.ROUTE_SETTINGS -> SettingsRoute
+            else -> if (habitId > 0L) HabitDetailRoute(habitId) else null
         }
-    }
-    
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        // Handle the intent when activity is already running (SINGLE_TOP)
-        setIntent(intent)
+        return route?.let { DeepLinkRequest(System.nanoTime(), it) }
     }
 }

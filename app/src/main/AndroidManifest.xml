@@ -2,27 +2,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Basic permissions -->
+    <!-- Core & Notifications -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    
-    <!-- Exact alarm permission (for habit reminders) -->
-    <!-- Note: SCHEDULE_EXACT_ALARM is available on API 31+ and requires user permission on API 31-32 -->
-    <!-- On API 33+, it's automatically granted -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    
-    <!-- Usage stats permission (user must grant in Settings) -->
+
+    <!-- Foreground Focus Timer, Live Updates (API 36+), Focus DND, Strict Alarm -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+
+    <!-- Usage stats permission (user grants in Settings) -->
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
-    
-    <!-- Removed restricted permissions:
-         - FOREGROUND_SERVICE_SPECIAL_USE: Requires special Play Store approval
-         - USE_EXACT_ALARM: Deprecated in favor of SCHEDULE_EXACT_ALARM
-         - ACCESS_NOTIFICATION_POLICY: Requires special permission, not needed for basic notifications
-    -->
 
     <application
         android:name=".TimeManagerApp"
@@ -34,22 +31,25 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.TimeManager">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.TimeManager"
             android:launchMode="singleTop"
-            android:screenOrientation="sensor"
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
-        
-        <!-- Immersive Fullscreen Timer Activity -->
+
+        <!-- Immersive Fullscreen Desk Landscape Timer -->
         <activity
             android:name=".ImmersiveTimerActivity"
             android:exported="false"
@@ -57,12 +57,56 @@
             android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
             android:launchMode="singleTask" />
-        
+
+        <!-- Persistent Focus Timer Foreground Service -->
+        <service
+            android:name=".focus.FocusTimerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-initiated countdown, stopwatch, and Pomodoro focus timer" />
+        </service>
+
+        <!-- Quick Settings Tiles -->
+        <service
+            android:name=".system.FocusTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_timemachine"
+            android:label="@string/qs_tile_focus_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".system.ScreenTimeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_timemachine"
+            android:label="@string/qs_tile_screen_time_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Reminder & Action Receivers -->
         <receiver
             android:name=".HabitReminderReceiver"
             android:enabled="true"
             android:exported="false" />
-        
+
+        <receiver
+            android:name=".notifications.PlannerReminderReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notifications.ReminderActionReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
@@ -71,9 +115,37 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
-        
+
+        <!-- Jetpack Glance Home/Lockscreen Widgets -->
+        <receiver
+            android:name=".widgets.TodayFocusWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_today_focus_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_today_focus_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.TodayHabitsWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_today_habits_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_today_habits_info" />
+        </receiver>
+
     </application>
 
 </manifest>

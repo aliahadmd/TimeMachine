@@ -21,17 +21,15 @@ data class TimeSession(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val categoryId: Long,
-    val startTime: Long, // Unix timestamp in milliseconds
-    val endTime: Long, // Unix timestamp in milliseconds
-    val durationMinutes: Int, // Calculated duration in minutes
-    val date: String, // Format: "YYYY-MM-DD" for easy querying
+    val startTime: Long,
+    val endTime: Long,
+    val durationMinutes: Int,
+    val date: String, // Format: "YYYY-MM-DD"
     val notes: String = "",
+    val linkedTaskId: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 
-/**
- * Data class for aggregated statistics
- */
 data class DailyStats(
     val date: String,
     val totalMinutes: Int,
@@ -51,7 +49,7 @@ data class StreakInfo(
     val currentStreak: Int,
     val longestStreak: Int,
     val totalActiveDays: Int,
-    val consistencyPercentage: Float // Active days / Total days * 100
+    val consistencyPercentage: Float
 )
 
 data class WeeklyActivity(
@@ -59,4 +57,3 @@ data class WeeklyActivity(
     val totalMinutes: Int,
     val dailyBreakdown: List<DailyStats>
 )
-

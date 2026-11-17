@@ -8,17 +8,17 @@ import android.os.Build
 import android.util.Log
 
 object ScreenTimeEventReceiver : BroadcastReceiver() {
-    
+
     private const val TAG = "ScreenTimeEventReceiver"
     private var registered = false
     private var appContext: Context? = null
-    
+
     private val intentFilter: IntentFilter = IntentFilter().apply {
         addAction(Intent.ACTION_SCREEN_ON)
         addAction(Intent.ACTION_SCREEN_OFF)
         addAction(Intent.ACTION_USER_PRESENT)
     }
-    
+
     fun register(context: Context) {
         if (registered) return
         val ctx = context.applicationContext
@@ -26,6 +26,7 @@ object ScreenTimeEventReceiver : BroadcastReceiver() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 ctx.registerReceiver(this, intentFilter, Context.RECEIVER_NOT_EXPORTED)
             } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
                 ctx.registerReceiver(this, intentFilter)
             }
             registered = true
@@ -35,7 +36,7 @@ object ScreenTimeEventReceiver : BroadcastReceiver() {
             Log.e(TAG, "Failed to register receiver", e)
         }
     }
-    
+
     fun unregister() {
         if (!registered) return
         try {
@@ -47,14 +48,13 @@ object ScreenTimeEventReceiver : BroadcastReceiver() {
             appContext = null
         }
     }
-    
+
     override fun onReceive(context: Context?, intent: Intent?) {
         val ctx = context?.applicationContext ?: return
         when (intent?.action) {
             Intent.ACTION_SCREEN_OFF,
             Intent.ACTION_SCREEN_ON,
             Intent.ACTION_USER_PRESENT -> {
-                Log.d(TAG, "Screen event: ${intent.action}")
                 ScreenTimeScheduler.triggerImmediateSync(ctx)
             }
         }

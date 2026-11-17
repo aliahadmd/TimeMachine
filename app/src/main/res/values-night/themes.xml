@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TimeManager" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF111318</item>
+    </style>
+</resources>

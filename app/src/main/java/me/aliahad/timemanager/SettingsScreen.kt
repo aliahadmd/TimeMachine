@@ -1,960 +1,542 @@
 package me.aliahad.timemanager
 
-import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import me.aliahad.timemanager.core.common.CurrencyCatalog
+import me.aliahad.timemanager.core.common.Formatters
+import me.aliahad.timemanager.core.datastore.ThemeMode
+import me.aliahad.timemanager.core.di.appViewModel
 import me.aliahad.timemanager.data.TimerDatabase
+import me.aliahad.timemanager.permissions.DeviceReliabilityManager
+import me.aliahad.timemanager.permissions.HealthSeverity
+import me.aliahad.timemanager.system.FocusTileService
+import me.aliahad.timemanager.system.ScreenTimeTileService
+import me.aliahad.timemanager.ui.components.ConfirmDeleteDialog
+import me.aliahad.timemanager.ui.components.M3TimePickerModal
+import me.aliahad.timemanager.ui.components.SectionCard
+import me.aliahad.timemanager.ui.components.TimeMachineTopBar
+import me.aliahad.timemanager.ui.theme.TimeMachineTheme
+import me.aliahad.timemanager.ui.viewmodel.BackupActionStatus
+import me.aliahad.timemanager.ui.viewmodel.SettingsViewModel
+import me.aliahad.timemanager.widgets.TodayFocusWidgetReceiver
+import me.aliahad.timemanager.widgets.TodayHabitsWidgetReceiver
+import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
+    val viewModel = appViewModel { container -> SettingsViewModel(container) }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val database = remember { TimerDatabase.getDatabase(context) }
-    val scope = rememberCoroutineScope()
-    
-    var showExportDialog by remember { mutableStateOf(false) }
-    var showImportDialog by remember { mutableStateOf(false) }
-    var showClearDataDialog by remember { mutableStateOf(false) }
-    var showAboutDialog by remember { mutableStateOf(false) }
-    var showCurrencyDialog by remember { mutableStateOf(false) }
-    var isExporting by remember { mutableStateOf(false) }
-    var isImporting by remember { mutableStateOf(false) }
-    var isClearing by remember { mutableStateOf(false) }
-    var operationMessage by remember { mutableStateOf<Pair<String, Boolean>?>(null) } // Message, isSuccess
-    
-    // Load user profile for currency setting
-    val userProfile by database.userProfileDao().getProfile().collectAsState(initial = null)
-    val selectedCurrency = userProfile?.currency ?: "৳"  // Derived directly from database
-    
-    // Log profile state for debugging
-    LaunchedEffect(userProfile) {
-        android.util.Log.d("SettingsScreen", "Profile loaded: ${userProfile?.let { "id=${it.id}, currency=${it.currency}" } ?: "null"}")
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.refreshReliabilityChecks()
     }
-    
-    // File picker for export (create document)
+
+    var pickQuietStart by remember { mutableStateOf(false) }
+    var pickQuietEnd by remember { mutableStateOf(false) }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var showClearConfirm by remember { mutableStateOf(false) }
+
     val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri: Uri? ->
-        uri?.let {
-            scope.launch {
-                isExporting = true
-                try {
-                    // Export data
-                    val exportResult = DataBackupManager.exportData(context, database)
-                    if (exportResult.isSuccess) {
-                        val backupData = exportResult.getOrNull()!!
-                        val saveResult = DataBackupManager.saveBackupToFile(context, uri, backupData)
-                        if (saveResult.isSuccess) {
-                            operationMessage = "✅ Data exported successfully!" to true
-                        } else {
-                            operationMessage = "❌ Failed to save backup file" to false
-                        }
-                    } else {
-                        operationMessage = "❌ Failed to export data" to false
-                    }
-                } catch (e: Exception) {
-                    operationMessage = "❌ Error: ${e.message}" to false
-                } finally {
-                    isExporting = false
-                }
-            }
-        }
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) viewModel.exportBackup(uri)
     }
-    
-    // File picker for import (select document)
+
     val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri?.let {
-            scope.launch {
-                isImporting = true
-                showImportDialog = false
-                try {
-                    val importResult = DataBackupManager.importData(context, uri, database)
-                    if (importResult.isSuccess) {
-                        val stats = importResult.getOrNull()!!
-                        operationMessage = stats.getDetailedMessage() to true
-                    } else {
-                        val error = importResult.exceptionOrNull()
-                        operationMessage = "❌ Import Failed\n${error?.message ?: "Unknown error"}" to false
-                    }
-                } catch (e: Exception) {
-                    operationMessage = "❌ Import Error\n${e.message}" to false
-                } finally {
-                    isImporting = false
-                }
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) pendingImportUri = uri
+    }
+
+    LaunchedEffect(state.backupStatus) {
+        when (val status = state.backupStatus) {
+            is BackupActionStatus.Success -> {
+                snackbarHostState.showSnackbar(status.message)
+                viewModel.clearBackupStatus()
             }
+            is BackupActionStatus.Error -> {
+                snackbarHostState.showSnackbar(status.message)
+                viewModel.clearBackupStatus()
+            }
+            else -> Unit
         }
     }
-    
+
+    val prefs = state.preferences
+    val statusColors = TimeMachineTheme.statusColors
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+            TimeMachineTopBar(
+                title = "Settings",
+                onBack = onBack
             )
         }
-    ) { padding ->
+    ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(innerPadding),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Section: General Settings
-            item {
-                Text(
-                    text = "General Settings",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-            
-            item {
-                SettingsCard(
-                    icon = Icons.Default.AttachMoney,
-                    title = "Currency",
-                    subtitle = "Current: $selectedCurrency",
-                    iconColor = Color(0xFFFFB74D),
-                    onClick = { showCurrencyDialog = true }
-                )
-            }
-            
-            // Section: Data Management
-            item {
-                Text(
-                    text = "Data Management",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
-                )
-            }
-            
-            item {
-                SettingsCard(
-                    icon = Icons.Default.Upload,
-                    title = "Export Data",
-                    subtitle = "Save backup to file",
-                    iconColor = Color(0xFF4CAF50),
-                    enabled = !isExporting && !isImporting && !isClearing,
-                    onClick = { showExportDialog = true }
-                )
-            }
-            
-            item {
-                SettingsCard(
-                    icon = Icons.Default.Download,
-                    title = "Import Data",
-                    subtitle = "Restore from backup file",
-                    iconColor = Color(0xFF2196F3),
-                    enabled = !isExporting && !isImporting && !isClearing,
-                    onClick = { showImportDialog = true }
-                )
-            }
-            
-            item {
-                SettingsCard(
-                    icon = Icons.Default.DeleteForever,
-                    title = "Clear All Data",
-                    subtitle = "Delete all app data (⚠️ Cannot be undone)",
-                    iconColor = Color(0xFFF44336),
-                    enabled = !isExporting && !isImporting && !isClearing,
-                    onClick = { showClearDataDialog = true }
-                )
-            }
-            
-            // Section: App Info
-            item {
-                Text(
-                    text = "About",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
-                )
-            }
-            
-            item {
-                SettingsCard(
-                    icon = Icons.Default.Info,
-                    title = "App Information",
-                    subtitle = "Version 3.0.0",
-                    iconColor = Color(0xFF9C27B0),
-                    onClick = { showAboutDialog = true }
-                )
-            }
-            
-            item {
-                SettingsCard(
-                    icon = Icons.Default.Storage,
-                    title = "Database Version",
-                    subtitle = "Version 13",
-                    iconColor = Color(0xFFFF9800),
-                    onClick = { }
-                )
-            }
-            
-            // Loading/Operation Feedback
-            if (isExporting || isImporting || isClearing) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        )
-                    ) {
+            item(key = "appearance") {
+                SectionCard {
+                    Text("Appearance", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        ThemeMode.entries.forEachIndexed { idx, mode ->
+                            SegmentedButton(
+                                selected = prefs.themeMode == mode,
+                                onClick = { viewModel.setThemeMode(mode) },
+                                shape = SegmentedButtonDefaults.itemShape(idx, ThemeMode.entries.size)
+                            ) {
+                                Text(mode.name.lowercase().replaceFirstChar { it.uppercase() })
+                            }
+                        }
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        Spacer(modifier = Modifier.height(12.dp))
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                            Text(
-                                text = when {
-                                    isExporting -> "Exporting data..."
-                                    isImporting -> "Importing data..."
-                                    isClearing -> "Clearing all data..."
-                                    else -> "Processing..."
-                                },
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
-                }
-            }
-            
-            // Operation Result Message
-            operationMessage?.let { (message, isSuccess) ->
-                item {
-                    // Auto-dismiss after 5 seconds for success messages
-                    if (isSuccess) {
-                        LaunchedEffect(Unit) {
-                            kotlinx.coroutines.delay(5000)
-                            operationMessage = null
-                        }
-                    }
-                    
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSuccess) {
-                                Color(0xFF4CAF50).copy(alpha = 0.1f)
-                            } else {
-                                Color(0xFFF44336).copy(alpha = 0.1f)
-                            }
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Text(
-                                text = message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f)
-                            )
-                            IconButton(onClick = { operationMessage = null }) {
-                                Icon(Icons.Default.Close, "Dismiss")
-                            }
-                        }
-                    }
-                }
-            }
-            
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
-            }
-        }
-    }
-    
-    // Export Confirmation Dialog
-    if (showExportDialog) {
-        ExportConfirmationDialog(
-            onDismiss = { showExportDialog = false },
-            onConfirm = {
-                showExportDialog = false
-                exportLauncher.launch(DataBackupManager.generateBackupFileName())
-            }
-        )
-    }
-    
-    // Import Warning Dialog
-    if (showImportDialog) {
-        ImportWarningDialog(
-            onDismiss = { showImportDialog = false },
-            onConfirm = {
-                showImportDialog = false
-                importLauncher.launch(arrayOf("application/json"))
-            }
-        )
-    }
-    
-    // Clear Data Confirmation Dialog
-    if (showClearDataDialog) {
-        ClearDataDialog(
-            onDismiss = { showClearDataDialog = false },
-            onConfirm = {
-                showClearDataDialog = false
-                scope.launch {
-                    isClearing = true
-                    try {
-                        withContext(Dispatchers.IO) {
-                            database.clearAllTables()
-                        }
-                        operationMessage = "✅ All data cleared successfully!" to true
-                    } catch (e: Exception) {
-                        operationMessage = "❌ Failed to clear data: ${e.message}" to false
-                    } finally {
-                        isClearing = false
-                    }
-                }
-            }
-        )
-    }
-    
-    // About Dialog
-    if (showAboutDialog) {
-        AboutDialog(onDismiss = { showAboutDialog = false })
-    }
-    
-    // Currency Selection Dialog
-    if (showCurrencyDialog) {
-        CurrencyDialog(
-            currentCurrency = selectedCurrency,
-            onDismiss = { showCurrencyDialog = false },
-            onCurrencySelected = { newCurrency ->
-                showCurrencyDialog = false
-                scope.launch {
-                    try {
-                        withContext(Dispatchers.IO) {
-                            // Get or create profile
-                            var profile = database.userProfileDao().getProfileSync()
-                            if (profile == null) {
-                                // Create default profile with selected currency
-                                val defaultProfile = me.aliahad.timemanager.data.UserProfile(
-                                    currency = newCurrency
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Dynamic Color (Material You)", style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    "Match phone wallpaper palette",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                database.userProfileDao().insertProfile(defaultProfile)
-                                android.util.Log.d("SettingsScreen", "Created new profile with currency: $newCurrency")
-                            } else {
-                                // Update existing profile
-                                val updatedProfile = profile.copy(
-                                    currency = newCurrency,
-                                    updatedAt = System.currentTimeMillis()
-                                )
-                                database.userProfileDao().updateProfile(updatedProfile)
-                                android.util.Log.d("SettingsScreen", "Updated profile currency to: $newCurrency")
                             }
-                        }
-                        // No need to update local state - Flow will automatically update UI
-                        operationMessage = "✅ Currency updated to $newCurrency" to true
-                    } catch (e: Exception) {
-                        android.util.Log.e("SettingsScreen", "Failed to update currency", e)
-                        operationMessage = "❌ Failed to update currency: ${e.message}" to false
-                    }
-                }
-            }
-        )
-    }
-}
-
-@Composable
-fun SettingsCard(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    iconColor: Color,
-    enabled: Boolean = true,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled) { onClick() },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = iconColor.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(12.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = iconColor,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-            }
-            
-            if (enabled) {
-                Icon(
-                    Icons.Default.ChevronRight,
-                    contentDescription = "Action",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ExportConfirmationDialog(
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                Icons.Default.Upload,
-                contentDescription = "Export",
-                tint = Color(0xFF4CAF50),
-                modifier = Modifier.size(48.dp)
-            )
-        },
-        title = {
-            Text(
-                text = "Export Your Data?",
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("This will create a backup file containing:")
-                
-                val items = listOf(
-                    "• Your profile settings",
-                    "• Focus tracker sessions & categories",
-                    "• Habits & completions",
-                    "• Expenses & categories",
-                    "• Subscriptions",
-                    "• Daily planner tasks",
-                    "• Date calculations",
-                    "• BMI records"
-                )
-                
-                items.forEach { item ->
-                    Text(
-                        text = item,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "The file will be saved in JSON format.",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = onConfirm) {
-                Text("Export")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Composable
-fun ImportWarningDialog(
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                Icons.Default.Warning,
-                contentDescription = "Warning",
-                tint = Color(0xFFFF9800),
-                modifier = Modifier.size(48.dp)
-            )
-        },
-        title = {
-            Text(
-                text = "Import Data Warning",
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "⚠️ Important:",
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFF9800)
-                )
-                
-                Text("Importing data will:")
-                
-                val warnings = listOf(
-                    "• Merge with existing data",
-                    "• Potentially create duplicate entries",
-                    "• Cannot be undone automatically"
-                )
-                
-                warnings.forEach { warning ->
-                    Text(
-                        text = warning,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "💡 Tip: Export current data first as a safety backup!",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF2196F3)
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF9800)
-                )
-            ) {
-                Text("I Understand, Import")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Composable
-fun ClearDataDialog(
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                Icons.Default.DeleteForever,
-                contentDescription = "Clear Data",
-                tint = Color(0xFFF44336),
-                modifier = Modifier.size(48.dp)
-            )
-        },
-        title = {
-            Text(
-                text = "Clear All Data?",
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "⚠️ CRITICAL WARNING:",
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFF44336)
-                )
-                
-                Text("This will permanently delete ALL app data:")
-                
-                val warnings = listOf(
-                    "• User profile",
-                    "• All focus tracker sessions",
-                    "• All habits and completions",
-                    "• All expenses and categories",
-                    "• All subscriptions",
-                    "• All daily planner tasks",
-                    "• All date calculations",
-                    "• All BMI records"
-                )
-                
-                warnings.forEach { warning ->
-                    Text(
-                        text = warning,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "⛔ THIS CANNOT BE UNDONE!",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFF44336)
-                )
-                
-                Text(
-                    text = "💡 Tip: Export your data first if you want to keep a backup!",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF2196F3)
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFF44336)
-                )
-            ) {
-                Text("Yes, Delete Everything")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Composable
-fun AboutDialog(onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 500.dp)
-        ) {
-            LazyColumn(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                item {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "⏰",
-                            style = MaterialTheme.typography.displayMedium
-                        )
-                        Text(
-                            text = "TimeManager",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Version 3.0.0",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-                
-                item {
-                    HorizontalDivider()
-                }
-                
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "Features",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        val features = listOf(
-                            "🎯 Focus Tracker",
-                            "✅ Habit Tracker",
-                            "💰 Expense Tracker",
-                            "📱 Subscription Tracker",
-                            "📋 Daily Planner",
-                            "📅 Year Calculator",
-                            "⚖️ BMI Calculator",
-                            "👤 User Profile"
-                        )
-                        
-                        features.forEach { feature ->
-                            Text(
-                                text = feature,
-                                style = MaterialTheme.typography.bodySmall
+                            Switch(
+                                checked = prefs.dynamicColor,
+                                onCheckedChange = { viewModel.setDynamicColor(it) }
                             )
                         }
                     }
                 }
-                
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "Database",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "• Version: 13",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = "• Storage: Local (Room Database)",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = "• Backup: JSON Export/Import",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-                
-                item {
-                    HorizontalDivider()
-                }
-                
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "Developer",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Ali Ahad",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = "🌐 aliahad.me",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "📧 ali@aliahad.me",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                
-                item {
-                    Button(
-                        onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Close")
-                    }
-                }
             }
-        }
-    }
-}
 
-@Composable
-fun CurrencyDialog(
-    currentCurrency: String,
-    onDismiss: () -> Unit,
-    onCurrencySelected: (String) -> Unit
-) {
-    // Define available currencies with their symbols and names
-    data class Currency(val symbol: String, val code: String, val name: String)
-    
-    val currencies = listOf(
-        Currency("৳", "BDT", "Bangladeshi Taka"),
-        Currency("$", "USD", "US Dollar"),
-        Currency("€", "EUR", "Euro"),
-        Currency("£", "GBP", "British Pound"),
-        Currency("¥", "CNY", "Chinese Yuan / RMB"),
-        Currency("₹", "INR", "Indian Rupee"),
-        Currency("¥", "JPY", "Japanese Yen"),
-        Currency("₩", "KRW", "South Korean Won"),
-        Currency("₽", "RUB", "Russian Ruble"),
-        Currency("R$", "BRL", "Brazilian Real"),
-        Currency("C$", "CAD", "Canadian Dollar"),
-        Currency("A$", "AUD", "Australian Dollar"),
-        Currency("CHF", "CHF", "Swiss Franc"),
-        Currency("kr", "SEK", "Swedish Krona"),
-        Currency("zł", "PLN", "Polish Zloty")
-    )
-    
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 600.dp),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            LazyColumn(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
+            item(key = "goals_currency") {
+                SectionCard {
+                    Text("Currency & Daily Goals", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("Default Currency (${prefs.currencyCode})", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Select Currency",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Used in Expense & Subscription Tracker",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
-                    }
-                }
-                
-                item {
-                    HorizontalDivider()
-                }
-                
-                items(currencies.size) { index ->
-                    val currency = currencies[index]
-                    val isSelected = currency.symbol == currentCurrency
-                    
-                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                onCurrencySelected(currency.symbol)
-                            },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            }
-                        ),
-                        elevation = CardDefaults.cardElevation(
-                            defaultElevation = if (isSelected) 4.dp else 1.dp
-                        )
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        CurrencyCatalog.ALL.forEach { spec ->
+                            FilterChip(
+                                selected = spec.code == prefs.currencyCode,
+                                onClick = { viewModel.setCurrencyCode(spec.code) },
+                                label = { Text("${spec.code} (${spec.symbol})") }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        "Daily Focus Goal: ${Formatters.formatMinutes(prefs.dailyFocusGoalMinutes)}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Slider(
+                        value = prefs.dailyFocusGoalMinutes.toFloat(),
+                        onValueChange = { viewModel.setDailyFocusGoalMinutes(((it / 15f).roundToInt() * 15).coerceIn(15, 480)) },
+                        valueRange = 15f..480f
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Daily Screen Time Limit: ${Formatters.formatMinutes(prefs.dailyScreenTimeLimitMinutes)}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Slider(
+                        value = prefs.dailyScreenTimeLimitMinutes.toFloat(),
+                        onValueChange = { viewModel.setDailyScreenTimeLimitMinutes(((it / 15f).roundToInt() * 15).coerceIn(30, 600)) },
+                        valueRange = 30f..600f
+                    )
+                }
+            }
+
+            item(key = "notifications_prefs") {
+                SectionCard {
+                    Text("Notifications & Focus Behavior", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SettingSwitchRow(
+                        title = "Enable Notifications",
+                        subtitle = "Habit, Planner, Subscription & Budget alerts",
+                        checked = prefs.notificationsEnabled,
+                        onCheckedChange = { viewModel.setNotificationsEnabled(it) }
+                    )
+                    SettingSwitchRow(
+                        title = "Quiet Hours",
+                        subtitle = String.format(
+                            java.util.Locale.US,
+                            "Silence reminders %02d:%02d – %02d:%02d",
+                            prefs.quietStartHour, prefs.quietStartMinute,
+                            prefs.quietEndHour, prefs.quietEndMinute
+                        ),
+                        checked = prefs.quietHoursEnabled,
+                        onCheckedChange = {
+                            viewModel.setQuietHours(
+                                it, prefs.quietStartHour, prefs.quietStartMinute,
+                                prefs.quietEndHour, prefs.quietEndMinute
+                            )
+                        }
+                    )
+                    if (prefs.quietHoursEnabled) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            OutlinedButton(
+                                onClick = { pickQuietStart = true },
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Text(
-                                    text = currency.symbol,
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Column {
-                                    Text(
-                                        text = currency.code,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = currency.name,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                    )
-                                }
+                                Text(String.format(java.util.Locale.US, "Start %02d:%02d", prefs.quietStartHour, prefs.quietStartMinute))
                             }
-                            
-                            if (isSelected) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = "Selected",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
+                            OutlinedButton(
+                                onClick = { pickQuietEnd = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(String.format(java.util.Locale.US, "End %02d:%02d", prefs.quietEndHour, prefs.quietEndMinute))
                             }
                         }
                     }
+                    SettingSwitchRow(
+                        title = "Focus Priority DND",
+                        subtitle = "Automatically enable Priority Do Not Disturb while timer runs (requires DND Access)",
+                        checked = prefs.focusDndEnabled,
+                        onCheckedChange = { viewModel.setFocusDndEnabled(it) }
+                    )
+                    SettingSwitchRow(
+                        title = "Strict Completion Alarm",
+                        subtitle = "Wake Lock Screen when a Focus countdown finishes",
+                        checked = prefs.focusStrictAlarmEnabled,
+                        onCheckedChange = { viewModel.setFocusStrictAlarmEnabled(it) }
+                    )
                 }
-                
-                item {
-                    HorizontalDivider()
+            }
+
+            item(key = "reliability_center") {
+                SectionCard {
+                    Text(
+                        text = if (state.isXiaomiDevice) "Phone & HyperOS Reliability Center"
+                        else "Phone System Reliability",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Keep timers alive in background and ensure reminders arrive on schedule.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.reliabilityChecks.forEach { check ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (check.isReady) statusColors.successContainer.copy(alpha = 0.25f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (check.isReady) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = if (check.isReady) statusColors.success
+                                        else if (check.severity == HealthSeverity.CRITICAL) statusColors.danger
+                                        else statusColors.warning,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(check.title, style = MaterialTheme.typography.titleSmall)
+                                        Text(
+                                            check.subtitle,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    TextButton(onClick = {
+                                        DeviceReliabilityManager.handleCheckAction(context, check.id)
+                                    }) {
+                                        Text(check.actionLabel)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Widgets & Quick Settings", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                DeviceReliabilityManager.requestAddQuickSettingsTile(
+                                    context,
+                                    FocusTileService::class.java,
+                                    "Focus Timer"
+                                )
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Add Focus Tile") }
+                        OutlinedButton(
+                            onClick = {
+                                DeviceReliabilityManager.requestAddQuickSettingsTile(
+                                    context,
+                                    ScreenTimeTileService::class.java,
+                                    "Screen Time"
+                                )
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Add Screen Tile") }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                DeviceReliabilityManager.requestPinWidget(
+                                    context,
+                                    TodayFocusWidgetReceiver::class.java
+                                )
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Pin Focus Widget") }
+                        OutlinedButton(
+                            onClick = {
+                                DeviceReliabilityManager.requestPinWidget(
+                                    context,
+                                    TodayHabitsWidgetReceiver::class.java
+                                )
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Pin Habits Widget") }
+                    }
                 }
-                
-                item {
-                    TextButton(
-                        onClick = onDismiss,
+            }
+
+            item(key = "backup_data") {
+                SectionCard {
+                    Text("Backup & Data", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                exportLauncher.launch("timemachine_backup_${java.time.LocalDate.now()}.json")
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Export JSON")
+                        }
+                        OutlinedButton(
+                            onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Restore")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = { showClearConfirm = true },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Cancel")
+                        Text("Clear All Local Records")
+                    }
+                }
+            }
+
+            item(key = "about") {
+                SectionCard {
+                    Text("About TimeMachine", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Version ${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE}) • DB Schema v${TimerDatabase.DATABASE_VERSION}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.replayTutorial() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Replay App Guide")
                     }
                 }
             }
         }
     }
+
+    if (pickQuietStart) {
+        M3TimePickerModal(
+            title = "Quiet Hours Start",
+            initialHour = prefs.quietStartHour,
+            initialMinute = prefs.quietStartMinute,
+            onDismiss = { pickQuietStart = false },
+            onTimeSelected = { h, m ->
+                viewModel.setQuietHours(true, h, m, prefs.quietEndHour, prefs.quietEndMinute)
+            }
+        )
+    }
+
+    if (pickQuietEnd) {
+        M3TimePickerModal(
+            title = "Quiet Hours End",
+            initialHour = prefs.quietEndHour,
+            initialMinute = prefs.quietEndMinute,
+            onDismiss = { pickQuietEnd = false },
+            onTimeSelected = { h, m ->
+                viewModel.setQuietHours(true, prefs.quietStartHour, prefs.quietStartMinute, h, m)
+            }
+        )
+    }
+
+    pendingImportUri?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { pendingImportUri = null },
+            title = { Text("Choose Restore Mode") },
+            text = {
+                Text("Replace removes existing local records before importing the backup. Merge inserts backup entries alongside existing data.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.importBackup(uri, ImportMode.REPLACE)
+                    pendingImportUri = null
+                }) { Text("Replace All") }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { pendingImportUri = null }) { Text("Cancel") }
+                    TextButton(onClick = {
+                        viewModel.importBackup(uri, ImportMode.MERGE)
+                        pendingImportUri = null
+                    }) { Text("Merge") }
+                }
+            }
+        )
+    }
+
+    if (showClearConfirm) {
+        ConfirmDeleteDialog(
+            title = "Clear All Local Data?",
+            message = "This permanently deletes all Focus sessions, Habits, Tasks, Expenses, Subscriptions, Calculators, and Screen Time logs. Theme and app settings are preserved.",
+            confirmText = "Clear Everything",
+            onDismiss = { showClearConfirm = false },
+            onConfirm = {
+                viewModel.clearAllUserData()
+                showClearConfirm = false
+            }
+        )
+    }
 }
 
+@Composable
+private fun SettingSwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}

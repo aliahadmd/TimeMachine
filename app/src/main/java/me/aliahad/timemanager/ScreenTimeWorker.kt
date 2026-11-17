@@ -1,210 +1,266 @@
 package me.aliahad.timemanager
 
+import android.app.PendingIntent
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.Intent
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import me.aliahad.timemanager.data.ScreenTimeDailySummary
-import me.aliahad.timemanager.data.ScreenTimeHourly
-import me.aliahad.timemanager.data.ScreenTimeSession
-import me.aliahad.timemanager.data.TimerDatabase
-import java.time.Instant
+import me.aliahad.timemanager.core.common.Formatters
+import me.aliahad.timemanager.core.common.SafeDateTime
+import me.aliahad.timemanager.core.di.appContainerOrNull
+import me.aliahad.timemanager.notifications.NotificationChannelRegistry
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 class ScreenTimeWorker(
     appContext: Context,
     params: WorkerParameters
 ) : CoroutineWorker(appContext, params) {
-    
+
     companion object {
+        private const val TAG = "ScreenTimeWorker"
         private const val PREFS_NAME = "screen_time_usage"
         private const val KEY_LAST_PROCESSED = "last_processed"
         private const val KEY_PENDING_START = "pending_start"
-        private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-        private const val MAX_LOOKBACK_MS = 12 * 60 * 60 * 1000L // 12 hours safeguard
+        private const val KEY_ACTIVE_APP_PKG = "active_app_pkg"
+        private const val KEY_PENDING_UNLOCK = "pending_unlock"
+        private const val MAX_LOOKBACK_MS = 12 * 60 * 60 * 1000L
     }
-    
+
     override suspend fun doWork(): Result {
+        // Without Usage Access granted, succeed quietly instead of triggering endless WorkManager retries
         if (!ScreenTimePermissionHelper.hasUsageAccess(applicationContext)) {
-            return Result.retry()
+            return Result.success()
         }
-        
+
         val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
         val defaultStart = (now - MAX_LOOKBACK_MS).coerceAtLeast(0L)
-        val lastProcessed = prefs.getLong(KEY_LAST_PROCESSED, defaultStart)
-        var pendingStart = prefs.getLong(KEY_PENDING_START, 0L).takeIf { it > 0 }
-        
-        val usageStatsManager = applicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
-            ?: return Result.failure()
-        
-        val events = usageStatsManager.queryEvents(lastProcessed, now)
-        val database = TimerDatabase.getDatabase(applicationContext)
-        val sessionPairs = mutableListOf<Pair<Long, Long>>()
-        
+        var lastProcessed = prefs.getLong(KEY_LAST_PROCESSED, defaultStart)
+        if (lastProcessed > now) {
+            // Clock rolled back: clamp safely
+            lastProcessed = defaultStart
+        }
+
+        var pendingStart = prefs.getLong(KEY_PENDING_START, 0L).takeIf { it > 0L && it <= now }
+        if (pendingStart != null && now - pendingStart > ScreenTimeSegmentSplitter.MAX_SINGLE_SESSION_MS) {
+            pendingStart = null
+        }
+        var activeAppPkg = prefs.getString(KEY_ACTIVE_APP_PKG, null)
+        var pendingUnlockCount = prefs.getInt(KEY_PENDING_UNLOCK, 0)
+
+        val usageStatsManager =
+            applicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+                ?: return Result.success()
+
+        val events = usageStatsManager.queryEvents(lastProcessed, now) ?: return Result.success()
+        val rawSegments = mutableListOf<RawScreenSession>()
+        val labelCache = mutableMapOf<String, String>()
         val event = UsageEvents.Event()
+
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
+            if (event.timeStamp < lastProcessed) continue
+
             when (event.eventType) {
                 UsageEvents.Event.SCREEN_INTERACTIVE -> {
                     if (pendingStart == null) {
                         pendingStart = event.timeStamp
+                        pendingUnlockCount = 0
                     }
                 }
-                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+
+                UsageEvents.Event.KEYGUARD_HIDDEN -> {
+                    if (pendingStart == null) {
+                        pendingStart = event.timeStamp
+                    }
+                    pendingUnlockCount += 1
+                }
+
+                UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    val pkg = event.packageName
+                    val currentStart = pendingStart
+                    if (currentStart != null && !activeAppPkg.isNullOrBlank() &&
+                        activeAppPkg != pkg && event.timeStamp > currentStart
+                    ) {
+                        rawSegments += RawScreenSession(
+                            startMs = currentStart,
+                            endMs = event.timeStamp,
+                            unlockCount = pendingUnlockCount.coerceAtLeast(if (rawSegments.isEmpty()) 1 else 0),
+                            appUsed = resolveAppLabel(activeAppPkg!!, labelCache)
+                        )
+                        pendingStart = event.timeStamp
+                        pendingUnlockCount = 0
+                    }
+                    if (!pkg.isNullOrBlank()) {
+                        activeAppPkg = pkg
+                    }
+                }
+
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE,
+                UsageEvents.Event.DEVICE_SHUTDOWN -> {
                     val start = pendingStart
                     if (start != null && event.timeStamp > start) {
-                        sessionPairs.add(start to event.timeStamp)
+                        rawSegments += RawScreenSession(
+                            startMs = start,
+                            endMs = event.timeStamp,
+                            unlockCount = pendingUnlockCount.coerceAtLeast(1),
+                            appUsed = activeAppPkg?.let { resolveAppLabel(it, labelCache) }
+                        )
                     }
                     pendingStart = null
-                }
-            }
-        }
-        
-        if (sessionPairs.isEmpty() && pendingStart == prefs.getLong(KEY_PENDING_START, 0L)) {
-            // Nothing new; update timestamp and exit
-            prefs.edit()
-                .putLong(KEY_LAST_PROCESSED, now)
-                .putLong(KEY_PENDING_START, pendingStart ?: 0L)
-                .apply()
-            return Result.success()
-        }
-        
-        val dao = database.screenTimeDao()
-        val affectedDates = mutableSetOf<String>()
-        
-        withContext(Dispatchers.IO) {
-            sessionPairs.forEach { (start, end) ->
-                val durationSeconds = ((end - start) / 1000).toInt()
-                if (durationSeconds <= 0) return@forEach
-                
-                val startDateTime = LocalDateTime.ofInstant(
-                    Instant.ofEpochMilli(start),
-                    ZoneId.systemDefault()
-                )
-                val endDateTime = LocalDateTime.ofInstant(
-                    Instant.ofEpochMilli(end),
-                    ZoneId.systemDefault()
-                )
-                
-                // Split sessions that span multiple days
-                var currentStart = startDateTime
-                var remainingEnd = endDateTime
-                while (currentStart.toLocalDate().isBefore(remainingEnd.toLocalDate())) {
-                    val splitEnd = currentStart.toLocalDate().atStartOfDay().plusDays(1)
-                    val splitDuration = ((splitEnd.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() -
-                        currentStart.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()) / 1000).toInt()
-                    if (splitDuration > 0) {
-                        saveSession(dao, currentStart, splitEnd, splitDuration)
-                        affectedDates.add(currentStart.toLocalDate().format(DATE_FORMAT))
+                    pendingUnlockCount = 0
+                    if (event.eventType == UsageEvents.Event.DEVICE_SHUTDOWN) {
+                        activeAppPkg = null
                     }
-                    currentStart = splitEnd
                 }
-                
-                // Final segment
-                val segmentDuration = ((remainingEnd.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() -
-                    currentStart.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()) / 1000).toInt()
-                if (segmentDuration > 0) {
-                    saveSession(dao, currentStart, remainingEnd, segmentDuration)
-                    affectedDates.add(currentStart.toLocalDate().format(DATE_FORMAT))
-                }
-            }
-            
-            affectedDates.forEach { date ->
-                updateDailySummary(date, dao)
-                updateHourlyData(date, dao)
             }
         }
-        
+
+        val container = applicationContext.appContainerOrNull()
+        val zoneId = ZoneId.systemDefault()
+        val affectedDates = mutableSetOf<String>()
+        val today = LocalDate.now(zoneId)
+        val todayIso = today.format(SafeDateTime.ISO_DATE)
+
+        withContext(Dispatchers.IO) {
+            val database = container?.database ?: me.aliahad.timemanager.data.TimerDatabase.getDatabase(
+                applicationContext
+            )
+            val dao = database.screenTimeDao()
+
+            rawSegments.forEach { raw ->
+                ScreenTimeSegmentSplitter.splitSessionByDay(raw, zoneId).forEach { slice ->
+                    dao.insertSession(slice)
+                    affectedDates += slice.date
+                }
+            }
+
+            affectedDates.forEach { date ->
+                val sessions = dao.getSessionsForDateSync(date)
+                ScreenTimeSegmentSplitter.buildDailySummary(date, sessions)?.let { summary ->
+                    dao.insertDailySummary(summary)
+                }
+                dao.deleteHourlyForDate(date)
+                ScreenTimeSegmentSplitter.buildHourlyBuckets(date, sessions, zoneId).forEach { hourly ->
+                    dao.insertHourlyData(hourly)
+                }
+            }
+
+            // Finalize yesterday's screen-time-under-limit habits if applicable
+            if (container != null) {
+                val userPrefs = container.preferencesRepository.getPreferences()
+                val yesterdayIso = today.minusDays(1).format(SafeDateTime.ISO_DATE)
+                val yesterdaySummary = dao.getDailySummary(yesterdayIso)
+                if (yesterdaySummary != null) {
+                    container.habitSyncUseCase.syncFinalizedScreenTimeDay(
+                        date = yesterdayIso,
+                        screenTimeMinutesForDay = yesterdaySummary.totalScreenTimeSeconds / 60,
+                        defaultLimitMinutes = userPrefs.dailyScreenTimeLimitMinutes
+                    )
+                }
+
+                // Check today's screen-time limit nudge (rate-limited once/day)
+                val todaySummary = dao.getDailySummary(todayIso)
+                val todayMinutes = (todaySummary?.totalScreenTimeSeconds ?: 0) / 60
+                if (todayMinutes >= userPrefs.dailyScreenTimeLimitMinutes &&
+                    userPrefs.dailyScreenTimeLimitMinutes > 0 &&
+                    userPrefs.lastScreenTimeNudgeDate != todayIso &&
+                    userPrefs.notificationsEnabled &&
+                    !NotificationChannelRegistry.isQuietHoursNow(userPrefs)
+                ) {
+                    postScreenTimeNudge(todayMinutes, userPrefs.dailyScreenTimeLimitMinutes)
+                    container.preferencesRepository.setLastScreenTimeNudgeDate(todayIso)
+                }
+
+                if (affectedDates.isNotEmpty()) {
+                    container.notificationGateway.requestWidgetRefresh()
+                }
+            }
+        }
+
         prefs.edit()
             .putLong(KEY_LAST_PROCESSED, now)
             .putLong(KEY_PENDING_START, pendingStart ?: 0L)
+            .putString(KEY_ACTIVE_APP_PKG, activeAppPkg)
+            .putInt(KEY_PENDING_UNLOCK, pendingUnlockCount)
             .apply()
-        
+
         return Result.success()
     }
-    
-    private suspend fun saveSession(
-        dao: me.aliahad.timemanager.data.ScreenTimeDao,
-        start: LocalDateTime,
-        end: LocalDateTime,
-        durationSeconds: Int
-    ) {
-        val session = ScreenTimeSession(
-            date = start.toLocalDate().format(DATE_FORMAT),
-            timestamp = start.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            sessionStart = start.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            sessionEnd = end.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            durationSeconds = durationSeconds,
-            unlockCount = 1,
-            wasWalking = false,
-            appUsed = null
-        )
-        if (!dao.hasSession(session.sessionStart)) {
-            dao.insertSession(session)
+
+    private fun resolveAppLabel(packageName: String, cache: MutableMap<String, String>): String {
+        cache[packageName]?.let { return it }
+        val label = try {
+            val info = applicationContext.packageManager.getApplicationInfo(packageName, 0)
+            applicationContext.packageManager.getApplicationLabel(info).toString().ifBlank { packageName }
+        } catch (_: Throwable) {
+            packageName.substringAfterLast('.')
         }
+        cache[packageName] = label
+        return label
     }
-    
-    private suspend fun updateDailySummary(
-        date: String,
-        dao: me.aliahad.timemanager.data.ScreenTimeDao
-    ) {
-        val sessions = dao.getSessionsForDateSync(date)
-        if (sessions.isEmpty()) return
-        
-        val totalScreenTime = sessions.sumOf { it.durationSeconds }
-        val pickupCount = sessions.size
-        val avgSession = totalScreenTime / pickupCount.coerceAtLeast(1)
-        val longestSession = sessions.maxOfOrNull { it.durationSeconds } ?: 0
-        val shortestSession = sessions.minOfOrNull { it.durationSeconds } ?: 0
-        val firstPickup = sessions.minOfOrNull { it.sessionStart }
-        val lastPickup = sessions.maxOfOrNull { it.sessionStart }
-        
-        val summary = ScreenTimeDailySummary(
-            date = date,
-            totalScreenTimeSeconds = totalScreenTime,
-            pickupsCount = pickupCount,
-            firstPickupTime = firstPickup,
-            lastPickupTime = lastPickup,
-            walkingScreenTimeSeconds = 0,
-            avgSessionDurationSeconds = avgSession,
-            longestSessionSeconds = longestSession,
-            shortestSessionSeconds = shortestSession,
-            notificationsCount = 0
-        )
-        dao.insertDailySummary(summary)
-    }
-    
-    private suspend fun updateHourlyData(
-        date: String,
-        dao: me.aliahad.timemanager.data.ScreenTimeDao
-    ) {
-        val sessions = dao.getSessionsForDateSync(date)
-        if (sessions.isEmpty()) return
-        
-        val hourlyMap = sessions.groupBy { session ->
-            LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(session.sessionStart),
-                ZoneId.systemDefault()
-            ).hour
-        }
-        
-        hourlyMap.forEach { (hour, hourSessions) ->
-            val totalTime = hourSessions.sumOf { it.durationSeconds }
-            val pickups = hourSessions.size
-            val hourlyData = ScreenTimeHourly(
-                date = date,
-                hour = hour,
-                screenTimeSeconds = totalTime,
-                pickupsCount = pickups
+
+    private fun postScreenTimeNudge(todayMinutes: Int, limitMinutes: Int) {
+        if (!NotificationChannelRegistry.hasPostNotificationsPermission(applicationContext)) return
+        NotificationChannelRegistry.ensureChannels(applicationContext)
+        val notifId = NotificationChannelRegistry.WELLBEING_NOTIF_BASE + 10
+        val tapIntent = Intent(applicationContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(
+                NotificationChannelRegistry.EXTRA_ROUTE_TARGET,
+                NotificationChannelRegistry.ROUTE_WELLBEING
             )
-            dao.insertHourlyData(hourlyData)
+            putExtra(NotificationChannelRegistry.EXTRA_INITIAL_TAB, 1)
+        }
+        val tapPending = PendingIntent.getActivity(
+            applicationContext,
+            notifId,
+            tapIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val focusIntent = Intent(applicationContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(
+                NotificationChannelRegistry.EXTRA_ROUTE_TARGET,
+                NotificationChannelRegistry.ROUTE_FOCUS
+            )
+            putExtra(NotificationChannelRegistry.EXTRA_AUTO_START_FOCUS, true)
+        }
+        val focusPending = PendingIntent.getActivity(
+            applicationContext,
+            notifId + 1,
+            focusIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(
+            applicationContext,
+            NotificationChannelRegistry.CHANNEL_WELLBEING_NUDGES
+        )
+            .setSmallIcon(R.drawable.ic_stat_timemachine)
+            .setContentTitle("Daily Screen Time Limit Reached")
+            .setContentText(
+                "${Formatters.formatMinutes(todayMinutes)} used today (goal ${Formatters.formatMinutes(limitMinutes)})"
+            )
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setAutoCancel(true)
+            .setContentIntent(tapPending)
+            .addAction(0, "Start 25m Focus", focusPending)
+            .build()
+
+        try {
+            NotificationManagerCompat.from(applicationContext).notify(notifId, notification)
+        } catch (sec: SecurityException) {
+            Log.w(TAG, "Cannot post screen time nudge", sec)
         }
     }
 }

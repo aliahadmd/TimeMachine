@@ -1,81 +1,85 @@
 package me.aliahad.timemanager
 
-import me.aliahad.timemanager.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import me.aliahad.timemanager.core.common.CurrencyCatalog
+import me.aliahad.timemanager.core.common.Formatters
+import me.aliahad.timemanager.core.common.SafeDateTime
+import me.aliahad.timemanager.data.*
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 object ProfileAnalytics {
-    
-    private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-    
-    /**
-     * Aggregate statistics from all modules
-     */
+
     suspend fun getUserStatistics(database: TimerDatabase): UserStatistics = withContext(Dispatchers.IO) {
-        val today = LocalDate.now().format(dateFormatter)
-        val thirtyDaysAgo = LocalDate.now().minusDays(30).format(dateFormatter)
-        
-        // Focus Tracker Stats
-        val totalFocusMinutes = database.timeSessionDao().getTotalMinutes() ?: 0
-        val totalFocusSessions = database.timeSessionDao().getTotalSessionCount()
-        val focusStreak = calculateFocusStreak(database)
-        val activeCategories = database.activityCategoryDao().getActiveCategoriesCount()
-        
-        // Habit Tracker Stats
+        val todayDate = LocalDate.now()
+        val today = todayDate.format(SafeDateTime.ISO_DATE)
+        val thirtyDaysAgo = todayDate.minusDays(29).format(SafeDateTime.ISO_DATE)
+        val sevenDaysAgo = todayDate.minusDays(6).format(SafeDateTime.ISO_DATE)
+
+        // Focus Tracker (SQL aggregates + single active-dates query)
+        val totalFocusMinutes = database.timeSessionDao().getTotalFocusMinutesSql()
+        val totalFocusSessions = database.timeSessionDao().getTotalSessionCountSql()
+        val todayFocusMinutes = database.timeSessionDao().getTotalMinutesForDate(today) ?: 0
+        val activeDates = database.timeSessionDao().getAllActiveDates()
+        val focusStreak = calculateStreaks(activeDates, totalDays = 30, today = todayDate).currentStreak
+        val activeCategories = database.activityCategoryDao().getActiveCategoryCount()
+
+        // Habit Tracker (active habits + ACHIEVED vs total active submissions)
         val allHabits = database.habitDao().getAllHabitsSync()
         val totalHabits = allHabits.size
         val activeHabits = allHabits.count { it.isActive }
-        val totalHabitCompletions = database.habitDao().getTotalCompletionsCount()
-        // Calculate actual success rate
-        val habitSuccessRate = if (activeHabits > 0 && totalHabitCompletions > 0) {
-            val expectedCompletions = activeHabits * 30 // Assume 30 day period
-            (totalHabitCompletions.toFloat() / expectedCompletions).coerceAtMost(1f)
+        val totalHabitCompletions = database.habitDao().getTotalCompletionsCountSql()
+        val activeAchieved = database.habitDao().getTotalActiveAchievedCountSql()
+        val activeSubmissions = database.habitDao().getTotalActiveSubmissionCountSql()
+        val habitSuccessRate = if (activeSubmissions > 0) {
+            (activeAchieved.toFloat() / activeSubmissions).coerceIn(0f, 1f)
         } else 0f
-        
-        // Expense Tracker Stats
-        val allExpenses = database.expenseDao().getAllExpensesSync()
-        val totalExpenses = allExpenses.size
-        val totalSpent = database.expenseDao().getTotalExpensesForDateRange(thirtyDaysAgo, today)
-        // Calculate average based on actual days with expenses, not fixed 30
-        val daysWithExpenses = allExpenses.map { it.date }.distinct().size
-        val averageDailySpending = if (daysWithExpenses > 0) totalSpent / daysWithExpenses else 0.0
-        val expenseCategories = database.expenseCategoryDao().getActiveCategoryCount()
-        
-        // Subscription Tracker Stats
-        val allSubscriptions = database.subscriptionDao().getAllSubscriptionsListSync()
-        val totalSubscriptions = allSubscriptions.size
-        val activeSubscriptions = database.subscriptionDao().getActiveSubscriptionCount()
-        val monthlySubscriptionCost = SubscriptionAnalytics.calculateTotalMonthlyCost(allSubscriptions.filter { it.isActive })
-        val yearlySubscriptionCost = SubscriptionAnalytics.calculateTotalYearlyCost(allSubscriptions.filter { it.isActive })
-        
-        // Daily Planner Stats
-        val allTasks = database.dailyTaskDao().getTaskCountForAllDates()
-        val completedTasks = database.dailyTaskDao().getCompletedCountForAllDates()
+
+        // Expense Tracker (30-day spend aligned with 30-day distinct spending days)
+        val totalExpenses = database.expenseDao().getTotalExpenseCountSql()
+        val totalSpentLast30 = database.expenseDao().getTotalForDateRange(thirtyDaysAgo, today) ?: 0.0
+        val expensesLast30Count = database.expenseDao().getExpenseCountInRangeSql(thirtyDaysAgo, today)
+        val distinctDays30 = database.expenseDao().getDistinctExpenseDaysInRangeSql(thirtyDaysAgo, today)
+        val averageDailySpending = if (distinctDays30 > 0) totalSpentLast30 / distinctDays30 else 0.0
+        val expenseCategories = database.expenseCategoryDao().getAllCategoriesSync().count { it.isActive }
+
+        // Subscription Tracker
+        val totalSubscriptions = database.subscriptionDao().getTotalSubscriptionCountSql()
+        val activeSubs = database.subscriptionDao().getActiveSubscriptionsSync()
+        val activeSubscriptions = activeSubs.size
+        val monthlySubscriptionCost = SubscriptionAnalytics.calculateTotalMonthlyCost(activeSubs)
+        val yearlySubscriptionCost = SubscriptionAnalytics.calculateTotalYearlyCost(activeSubs)
+
+        // Daily Planner (SQL aggregates)
+        val allTasks = database.dailyTaskDao().getTotalTaskCountSql()
+        val completedTasks = database.dailyTaskDao().getTotalCompletedTaskCountSql()
         val taskCompletionRate = if (allTasks > 0) completedTasks.toFloat() / allTasks else 0f
         val todayTasks = database.dailyTaskDao().getTaskCountForDate(today)
         val todayCompleted = database.dailyTaskDao().getCompletedCountForDate(today)
-        val upcomingTasks = (todayTasks - todayCompleted).coerceAtLeast(0) // Prevent negative
-        
-        // Year Calculator Stats
-        val savedCalculations = database.dateCalculationDao().getAllCalculationsCount()
-        
-        // BMI Calculator Stats
-        val bmiRecords = database.bmiCalculationDao().getAllRecordsCount()
-        val latestBMI = database.bmiCalculationDao().getLatestBMI()
-        
+        val upcomingTasks = (todayTasks - todayCompleted).coerceAtLeast(0)
+
+        // Screen Timer
+        val todayScreenTimeSeconds = database.screenTimeDao().getDailySummary(today)?.totalScreenTimeSeconds ?: 0
+        val sevenDayAvgScreenTimeSeconds = (database.screenTimeDao().getAverageScreenTime(sevenDaysAgo, today) ?: 0.0).toInt()
+
+        // Year & BMI Calculators
+        val savedCalculations = database.dateCalculationDao().getCalculationCount()
+        val bmiRecords = database.bmiCalculationDao().getCalculationCount()
+        val latestBMI = database.bmiCalculationDao().getLatestCalculation()?.bmiValue
+
         UserStatistics(
             totalFocusMinutes = totalFocusMinutes,
             totalFocusSessions = totalFocusSessions,
             focusStreak = focusStreak,
             activeCategories = activeCategories,
+            todayFocusMinutes = todayFocusMinutes,
             totalHabits = totalHabits,
             activeHabits = activeHabits,
             totalHabitCompletions = totalHabitCompletions,
             habitSuccessRate = habitSuccessRate,
             totalExpenses = totalExpenses,
-            totalSpent = totalSpent,
+            totalSpentLast30Days = totalSpentLast30,
+            totalExpensesLast30DaysCount = expensesLast30Count,
             averageDailySpending = averageDailySpending,
             expenseCategories = expenseCategories,
             totalSubscriptions = totalSubscriptions,
@@ -86,41 +90,14 @@ object ProfileAnalytics {
             completedTasks = completedTasks,
             taskCompletionRate = taskCompletionRate,
             upcomingTasks = upcomingTasks,
+            todayScreenTimeSeconds = todayScreenTimeSeconds,
+            sevenDayAvgScreenTimeSeconds = sevenDayAvgScreenTimeSeconds,
             savedCalculations = savedCalculations,
             bmiRecords = bmiRecords,
             latestBMI = latestBMI
         )
     }
-    
-    private suspend fun calculateFocusStreak(database: TimerDatabase): Int {
-        // Calculate consecutive days with focus sessions
-        var streak = 0
-        var currentDate = LocalDate.now()
-        val maxStreakDays = 365 // Safety limit to prevent infinite loops
-        
-        try {
-            while (streak < maxStreakDays) {
-                val dateStr = currentDate.format(dateFormatter)
-                val minutesForDate = database.timeSessionDao().getTotalMinutesForDate(dateStr) ?: 0
-                
-                if (minutesForDate > 0) {
-                    streak++
-                    currentDate = currentDate.minusDays(1)
-                } else {
-                    break
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("ProfileAnalytics", "Error calculating streak", e)
-            return 0
-        }
-        
-        return streak
-    }
-    
-    /**
-     * Get user achievements based on statistics
-     */
+
     fun getUserAchievements(stats: UserStatistics): List<UserAchievement> {
         return listOf(
             UserAchievement(
@@ -175,30 +152,14 @@ object ProfileAnalytics {
             )
         )
     }
-    
-    /**
-     * Format duration in hours and minutes
-     */
-    fun formatDuration(minutes: Int): String {
-        val hours = minutes / 60
-        val mins = minutes % 60
-        return when {
-            hours == 0 -> "${mins}m"
-            mins == 0 -> "${hours}h"
-            else -> "${hours}h ${mins}m"
-        }
-    }
-    
-    /**
-     * Format currency
-     */
-    fun formatCurrency(amount: Double, currency: String = "৳"): String {
-        return "$currency%.2f".format(amount)
-    }
-    
-    /**
-     * Get emoji for profile avatar selection
-     */
+
+    fun formatDuration(minutes: Int): String = Formatters.formatMinutes(minutes)
+
+    fun formatCurrency(
+        amount: Double,
+        currency: String = CurrencyCatalog.DEFAULT_SYMBOL
+    ): String = Formatters.formatCurrency(amount, currency)
+
     fun getAvatarEmojis(): List<String> {
         return listOf(
             "👤", "👨", "👩", "🧑", "👦", "👧",
@@ -208,104 +169,3 @@ object ProfileAnalytics {
         )
     }
 }
-
-// Extension functions for DAOs to support ProfileAnalytics
-suspend fun TimeSessionDao.getTotalMinutes(): Int? {
-    // Get all sessions and sum durations
-    return try {
-        val sessions = getAllSessionsSync()
-        sessions.sumOf { it.durationMinutes }
-    } catch (e: Exception) {
-        0
-    }
-}
-
-suspend fun TimeSessionDao.getTotalSessionCount(): Int {
-    return try {
-        getAllSessionsSync().size
-    } catch (e: Exception) {
-        0
-    }
-}
-
-suspend fun ActivityCategoryDao.getActiveCategoriesCount(): Int {
-    return getAllCategoriesSync().count { it.isActive }
-}
-
-suspend fun HabitDao.getTotalCompletionsCount(): Int {
-    return try {
-        getAllCompletionsSync().size
-    } catch (e: Exception) {
-        0
-    }
-}
-
-suspend fun ExpenseDao.getTotalExpensesForDateRange(startDate: String, endDate: String): Double {
-    return try {
-        val expenses = getAllExpensesSync()
-        expenses.filter { it.date >= startDate && it.date <= endDate }.sumOf { it.amount }
-    } catch (e: Exception) {
-        0.0
-    }
-}
-
-suspend fun ExpenseCategoryDao.getActiveCategoryCount(): Int {
-    return getAllCategoriesSync().count { it.isActive }
-}
-
-suspend fun SubscriptionDao.getAllSubscriptionsListSync(): List<Subscription> {
-    return try {
-        getAllSubscriptionsSync()
-    } catch (e: Exception) {
-        emptyList()
-    }
-}
-
-suspend fun DailyTaskDao.getTaskCountForAllDates(): Int {
-    return try {
-        getAllTasksSync().size
-    } catch (e: Exception) {
-        0
-    }
-}
-
-suspend fun DailyTaskDao.getCompletedCountForAllDates(): Int {
-    return try {
-        getAllTasksSync().count { it.isCompleted }
-    } catch (e: Exception) {
-        0
-    }
-}
-
-suspend fun DailyTaskDao.getAllTasksSync(): List<DailyTask> {
-    return try {
-        getAllTasks()
-    } catch (e: Exception) {
-        emptyList()
-    }
-}
-
-suspend fun DateCalculationDao.getAllCalculationsCount(): Int {
-    return try {
-        getAllCalculationsSync().size
-    } catch (e: Exception) {
-        0
-    }
-}
-
-suspend fun BMICalculationDao.getAllRecordsCount(): Int {
-    return try {
-        getAllRecordsSync().size
-    } catch (e: Exception) {
-        0
-    }
-}
-
-suspend fun BMICalculationDao.getLatestBMI(): Float? {
-    return try {
-        getAllRecordsSync().maxByOrNull { it.createdAt }?.bmiValue
-    } catch (e: Exception) {
-        null
-    }
-}
-

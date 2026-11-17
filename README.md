@@ -11,7 +11,7 @@
 
 Focus Tracker • Screen Time • Habit Tracker • Year Calculator • BMI Calculator • Expense Tracker • Subscription Tracker • Daily Planner
 
-[Download APK](https://github.com/aliahadmd/TimeMachine/releases/latest) • [Report Bug](https://github.com/aliahadmd/TimeMachine/issues) • [Request Feature](https://github.com/aliahadmd/TimeMachine/issues)
+[Download APK](https://github.com/LiLabsAI/TimeMachine/releases/latest) • [Report Bug](https://github.com/LiLabsAI/TimeMachine/issues) • [Request Feature](https://github.com/LiLabsAI/TimeMachine/issues)
 
 </div>
 
@@ -81,7 +81,7 @@ Focus Tracker • Screen Time • Habit Tracker • Year Calculator • BMI Calc
 ## 📥 Installation
 
 ### Download APK
-1. Go to [Releases](https://github.com/aliahadmd/TimeMachine/releases/latest)
+1. Go to [Releases](https://github.com/LiLabsAI/TimeMachine/releases/latest)
 2. Download `TimeMachineV3.0.0.apk`
 3. Enable "Install from Unknown Sources" in your Android settings
 4. Open the APK and install
@@ -144,7 +144,7 @@ The classic Focus Timer technique:
 
 ```bash
 # Clone the repository
-git clone https://github.com/aliahadmd/TimeMachine.git
+git clone https://github.com/LiLabsAI/TimeMachine.git
 cd TimeManager
 
 # Build debug APK
@@ -254,7 +254,7 @@ Download `Focus TimerTimer-v1.0.1.apk` below and install on your Android device.
 
 **Minimum Android Version**: Android 12 (API 31)
 
-**Full Changelog**: https://github.com/aliahadmd/TimeMachine/compare/v1.0.0...v1.0.1
+**Full Changelog**: https://github.com/LiLabsAI/TimeMachine/compare/v1.0.0...v1.0.1
 ```
 
 ---
@@ -281,7 +281,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 None at the moment! 🎉
 
-If you find any bugs, please [open an issue](https://github.com/aliahadmd/TimeMachine/issues).
+If you find any bugs, please [open an issue](https://github.com/LiLabsAI/TimeMachine/issues).
 
 ---
 

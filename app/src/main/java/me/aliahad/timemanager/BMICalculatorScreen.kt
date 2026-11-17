@@ -1,997 +1,486 @@
 package me.aliahad.timemanager
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
-import me.aliahad.timemanager.data.*
-import kotlin.math.roundToInt
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import me.aliahad.timemanager.core.common.Formatters
+import me.aliahad.timemanager.core.di.appViewModel
+import me.aliahad.timemanager.data.BMICalculation
+import me.aliahad.timemanager.data.BMIClassification
+import me.aliahad.timemanager.data.Gender
+import me.aliahad.timemanager.data.WHOBMICategory
+import me.aliahad.timemanager.ui.components.ConfirmDeleteDialog
+import me.aliahad.timemanager.ui.components.EmptyStateView
+import me.aliahad.timemanager.ui.components.SectionCard
+import me.aliahad.timemanager.ui.components.TimeMachineTopBar
+import me.aliahad.timemanager.ui.theme.TabularNumberStyle
+import me.aliahad.timemanager.ui.viewmodel.BMICalculatorViewModel
+import kotlin.math.cos
+import kotlin.math.sin
 
-enum class HeightUnit { CM, FT_IN }
-enum class WeightUnit { KG, LBS }
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BMICalculatorScreen(onNavigateBack: () -> Unit) {
-    val context = LocalContext.current
-    val database = remember { TimerDatabase.getDatabase(context) }
-    val bmiDao = database.bmiCalculationDao()
-    val scope = rememberCoroutineScope()
-    
-    val savedCalculations by bmiDao.getAllCalculations().collectAsState(initial = emptyList())
-    
-    var showCalculator by remember { mutableStateOf(true) }
-    var showSaveDialog by remember { mutableStateOf(false) }
-    
-    // Input states
-    var age by remember { mutableStateOf("") }
-    var heightCm by remember { mutableFloatStateOf(170f) }
-    var weightKg by remember { mutableFloatStateOf(70f) }
+    val viewModel = appViewModel { container -> BMICalculatorViewModel(container) }
+    val records by viewModel.savedRecords.collectAsStateWithLifecycle()
+
+    var useImperial by remember { mutableStateOf(false) }
     var gender by remember { mutableStateOf(Gender.MALE) }
     var classification by remember { mutableStateOf(BMIClassification.WHO) }
-    
-    // Unit preferences
-    var heightUnit by remember { mutableStateOf(HeightUnit.CM) }
-    var weightUnit by remember { mutableStateOf(WeightUnit.KG) }
-    
-    // Calculated values
-    val bmiValue = remember(heightCm, weightKg) { calculateBMI(heightCm, weightKg) }
-    val bmiCategory = remember(bmiValue, age, gender, classification) {
-        age.toIntOrNull()?.let { ageInt ->
-            getBMICategory(bmiValue, ageInt, gender, classification)
-        } ?: "Enter age"
-    }
-    
+    var ageText by remember { mutableStateOf("28") }
+    var heightCm by remember { mutableFloatStateOf(172f) }
+    var weightKg by remember { mutableFloatStateOf(70f) }
+
+    var editingRecord by remember { mutableStateOf<BMICalculation?>(null) }
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<BMICalculation?>(null) }
+
+    val age = ageText.toIntOrNull()
+    val validation = validateBMIInputs(age, heightCm, weightKg)
+    val bmi = if (validation.isValid) calculateBMI(heightCm, weightKg) else 0f
+    val safeAge = age ?: 28
+    val category = getBMICategory(bmi, safeAge, gender, classification)
+    val catColor = Color(getBMICategoryColor(bmi, safeAge, gender, classification))
+    val idealRange = getIdealWeightRange(heightCm, gender, safeAge, classification)
+    val guidance = getTargetWeightGuidance(weightKg, (idealRange.first + idealRange.second) / 2f)
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("💪 BMI Calculator") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+            TimeMachineTopBar(
+                title = "BMI Calculator",
+                onBack = onNavigateBack
+            )
+        }
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item(key = "bmi_inputs") {
+                SectionCard {
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = !useImperial,
+                            onClick = { useImperial = false },
+                            shape = SegmentedButtonDefaults.itemShape(0, 2)
+                        ) { Text("Metric (cm / kg)") }
+                        SegmentedButton(
+                            selected = useImperial,
+                            onClick = { useImperial = true },
+                            shape = SegmentedButtonDefaults.itemShape(1, 2)
+                        ) { Text("Imperial (ft·in / lbs)") }
                     }
-                },
-                actions = {
-                    IconButton(onClick = { showCalculator = !showCalculator }) {
-                        Icon(
-                            if (showCalculator) Icons.Default.History else Icons.Default.Calculate,
-                            if (showCalculator) "View history" else "Calculate"
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Gender.entries.forEach { g ->
+                            FilterChip(
+                                selected = gender == g,
+                                onClick = { gender = g },
+                                label = { Text(g.displayName) }
+                            )
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BMIClassification.entries.forEach { cls ->
+                            FilterChip(
+                                selected = classification == cls,
+                                onClick = { classification = cls },
+                                label = { Text(cls.name) }
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = ageText,
+                        onValueChange = { ageText = it.filter(Char::isDigit).take(3) },
+                        label = { Text("Age (2–120)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    if (!useImperial) {
+                        Text(
+                            "Height: ${heightCm.toInt()} cm",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Slider(
+                            value = heightCm,
+                            onValueChange = { heightCm = it },
+                            valueRange = 50f..250f
+                        )
+                        Text(
+                            "Weight: ${Formatters.formatOneDecimal(weightKg)} kg",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Slider(
+                            value = weightKg,
+                            onValueChange = { weightKg = it },
+                            valueRange = 20f..250f
+                        )
+                    } else {
+                        val (feet, inches) = cmToFeetAndInches(heightCm)
+                        val totalInches = (feet * 12 + inches).toFloat().coerceIn(24f, 96f)
+                        Text(
+                            "Height: $feet ft $inches in (${heightCm.toInt()} cm)",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Slider(
+                            value = totalInches,
+                            onValueChange = { nextIn ->
+                                val rounded = nextIn.toInt()
+                                heightCm = feetAndInchesToCm(rounded / 12, rounded % 12)
+                            },
+                            valueRange = 24f..96f
+                        )
+                        val lbs = kgToLbs(weightKg)
+                        Text(
+                            "Weight: ${Formatters.formatOneDecimal(lbs)} lbs",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Slider(
+                            value = lbs.coerceIn(44f, 550f),
+                            onValueChange = { weightKg = lbsToKg(it) },
+                            valueRange = 44f..550f
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        },
-        floatingActionButton = {
-            if (showCalculator && age.toIntOrNull() != null) {
-                FloatingActionButton(
-                    onClick = { showSaveDialog = true },
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Default.Save, "Save")
+
+                    if (!validation.isValid && validation.errorMessage != null) {
+                        Text(
+                            text = validation.errorMessage,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
+            item(key = "bmi_result") {
+                SectionCard {
+                    ResponsiveBMIGauge(bmi = bmi, accent = catColor)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = category,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = catColor,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = getBMIInterpretation(bmi, category, classification),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val rangeLabel = if (!useImperial) {
+                        "${Formatters.formatOneDecimal(idealRange.first)} – ${Formatters.formatOneDecimal(idealRange.second)} kg"
+                    } else {
+                        "${Formatters.formatOneDecimal(kgToLbs(idealRange.first))} – ${Formatters.formatOneDecimal(kgToLbs(idealRange.second))} lbs"
+                    }
+                    Text(
+                        text = "Ideal weight range: $rangeLabel",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = guidance,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        enabled = validation.isValid,
+                        onClick = {
+                            editingRecord = null
+                            showSaveDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text("Save BMI Record")
+                    }
+                }
+            }
+
+            if (classification == BMIClassification.WHO) {
+                item(key = "who_legend") {
+                    SectionCard {
+                        Text("WHO 8-Band Reference", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            WHOBMICategory.entries.forEach { band ->
+                                val maxStr = if (band.maxBMI > 100f) "+" else "–${band.maxBMI}"
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(band.displayName, style = MaterialTheme.typography.bodySmall, color = Color(band.color))
+                                    Text(
+                                        "${band.minBMI}$maxStr",
+                                        style = MaterialTheme.typography.bodySmall.merge(TabularNumberStyle)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item(key = "bmi_history_hdr") {
+                Text("Saved History (${records.size})", style = MaterialTheme.typography.titleMedium)
+            }
+
+            if (records.size >= 2) {
+                item(key = "bmi_trend_summary") {
+                    val latest = records.first()
+                    val previous = records[1]
+                    val bmiDelta = latest.bmiValue - previous.bmiValue
+                    val weightDelta = latest.weightKg - previous.weightKg
+                    val bmiSign = if (bmiDelta >= 0f) "+" else ""
+                    val wSign = if (weightDelta >= 0f) "+" else ""
+                    SectionCard {
+                        Text("Recent Trend", style = MaterialTheme.typography.titleSmall)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "BMI ${bmiSign}${Formatters.formatOneDecimal(bmiDelta)} • Weight ${wSign}${Formatters.formatOneDecimal(weightDelta)} kg vs prior entry",
+                            style = MaterialTheme.typography.bodySmall.merge(TabularNumberStyle),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            if (records.isEmpty()) {
+                item(key = "empty_bmi") {
+                    EmptyStateView(
+                        emoji = "⚖️",
+                        title = "No Saved BMI Entries",
+                        subtitle = "Save measurements above to track BMI changes over time."
+                    )
+                }
+            } else {
+                items(records, key = { it.id }) { item ->
+                    SectionCard {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(item.name, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    "BMI ${formatBMI(item.bmiValue)} • ${item.category} (${item.classification.name})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    "${item.heightCm.toInt()} cm • ${Formatters.formatOneDecimal(item.weightKg)} kg • Age ${item.age}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = {
+                                editingRecord = item
+                                ageText = item.age.toString()
+                                heightCm = item.heightCm
+                                weightKg = item.weightKg
+                                gender = item.gender
+                                classification = item.classification
+                                showSaveDialog = true
+                            }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(18.dp))
+                            }
+                            IconButton(onClick = { pendingDelete = item }) {
+                                Icon(
+                                    Icons.Default.DeleteOutline,
+                                    contentDescription = "Delete",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            AnimatedContent(
-                targetState = showCalculator,
-                transitionSpec = {
-                    slideInHorizontally { if (targetState) it else -it } + fadeIn() togetherWith
-                            slideOutHorizontally { if (targetState) -it else it } + fadeOut()
-                }
-            ) { isCalculatorView ->
-                if (isCalculatorView) {
-                    BMICalculatorView(
-                        age = age,
+    }
+
+    if (showSaveDialog) {
+        SaveBMIDialog(
+            existing = editingRecord,
+            onDismiss = { showSaveDialog = false },
+            onConfirm = { label ->
+                val now = System.currentTimeMillis()
+                viewModel.saveRecord(
+                    BMICalculation(
+                        id = editingRecord?.id ?: 0L,
+                        name = label,
+                        age = safeAge,
                         heightCm = heightCm,
                         weightKg = weightKg,
                         gender = gender,
                         classification = classification,
-                        heightUnit = heightUnit,
-                        weightUnit = weightUnit,
-                        bmiValue = bmiValue,
-                        bmiCategory = bmiCategory,
-                        onAgeChange = { age = it },
-                        onHeightChange = { heightCm = it },
-                        onWeightChange = { weightKg = it },
-                        onGenderChange = { gender = it },
-                        onClassificationChange = { classification = it },
-                        onHeightUnitChange = { heightUnit = it },
-                        onWeightUnitChange = { weightUnit = it }
-                    )
-                } else {
-                    BMIHistoryView(
-                        calculations = savedCalculations,
-                        onCalculationClick = { calc ->
-                            age = calc.age.toString()
-                            heightCm = calc.heightCm
-                            weightKg = calc.weightKg
-                            gender = calc.gender
-                            classification = calc.classification
-                            showCalculator = true
-                        },
-                        onCalculationDelete = { calc ->
-                            scope.launch {
-                                bmiDao.deleteCalculation(calc)
-                            }
-                        }
-                    )
-                }
-            }
-        }
-        
-        if (showSaveDialog) {
-            SaveBMIDialog(
-                bmiValue = bmiValue,
-                category = bmiCategory,
-                onDismiss = { showSaveDialog = false },
-                onSave = { name ->
-                    scope.launch {
-                        age.toIntOrNull()?.let { ageInt ->
-                            val calculation = BMICalculation(
-                                name = name,
-                                age = ageInt,
-                                heightCm = heightCm,
-                                weightKg = weightKg,
-                                gender = gender,
-                                classification = classification,
-                                bmiValue = bmiValue,
-                                category = bmiCategory
-                            )
-                            bmiDao.insertCalculation(calculation)
-                            showSaveDialog = false
-                        }
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-fun BMICalculatorView(
-    age: String,
-    heightCm: Float,
-    weightKg: Float,
-    gender: Gender,
-    classification: BMIClassification,
-    heightUnit: HeightUnit,
-    weightUnit: WeightUnit,
-    bmiValue: Float,
-    bmiCategory: String,
-    onAgeChange: (String) -> Unit,
-    onHeightChange: (Float) -> Unit,
-    onWeightChange: (Float) -> Unit,
-    onGenderChange: (Gender) -> Unit,
-    onClassificationChange: (BMIClassification) -> Unit,
-    onHeightUnitChange: (HeightUnit) -> Unit,
-    onWeightUnitChange: (WeightUnit) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            BMIInputCard(
-                age = age,
-                heightCm = heightCm,
-                weightKg = weightKg,
-                gender = gender,
-                classification = classification,
-                heightUnit = heightUnit,
-                weightUnit = weightUnit,
-                onAgeChange = onAgeChange,
-                onHeightChange = onHeightChange,
-                onWeightChange = onWeightChange,
-                onGenderChange = onGenderChange,
-                onClassificationChange = onClassificationChange,
-                onHeightUnitChange = onHeightUnitChange,
-                onWeightUnitChange = onWeightUnitChange
-            )
-        }
-        
-        if (age.toIntOrNull() != null && bmiValue > 0) {
-            item {
-                BMIResultCard(bmiValue, bmiCategory)
-            }
-            
-            item {
-                BMIGaugeCard(bmiValue)
-            }
-            
-            item {
-                IdealWeightCard(heightCm, gender)
-            }
-            
-            item {
-                HealthTipsCard(bmiValue)
-            }
-        }
-    }
-}
-
-@Composable
-fun BMIInputCard(
-    age: String,
-    heightCm: Float,
-    weightKg: Float,
-    gender: Gender,
-    classification: BMIClassification,
-    heightUnit: HeightUnit,
-    weightUnit: WeightUnit,
-    onAgeChange: (String) -> Unit,
-    onHeightChange: (Float) -> Unit,
-    onWeightChange: (Float) -> Unit,
-    onGenderChange: (Gender) -> Unit,
-    onClassificationChange: (BMIClassification) -> Unit,
-    onHeightUnitChange: (HeightUnit) -> Unit,
-    onWeightUnitChange: (WeightUnit) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                "📝 Enter Your Details",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            
-            // Age
-            OutlinedTextField(
-                value = age,
-                onValueChange = onAgeChange,
-                label = { Text("Age (years)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                leadingIcon = { Icon(Icons.Default.Cake, null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            
-            // Gender Selection
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Gender.values().forEach { genderOption ->
-                    FilterChip(
-                        selected = gender == genderOption,
-                        onClick = { onGenderChange(genderOption) },
-                        label = { Text(genderOption.displayName) },
-                        leadingIcon = if (gender == genderOption) {
-                            { Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp)) }
-                        } else null,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            
-            // Height Input
-            HeightInput(
-                heightCm = heightCm,
-                unit = heightUnit,
-                onHeightChange = onHeightChange,
-                onUnitChange = onHeightUnitChange
-            )
-            
-            // Weight Input
-            WeightInput(
-                weightKg = weightKg,
-                unit = weightUnit,
-                onWeightChange = onWeightChange,
-                onUnitChange = onWeightUnitChange
-            )
-            
-            // Classification
-            Text(
-                "Classification System",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                BMIClassification.values().forEach { classOption ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onClassificationChange(classOption) }
-                            .background(
-                                if (classification == classOption)
-                                    MaterialTheme.colorScheme.primaryContainer
-                                else Color.Transparent
-                            )
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = classification == classOption,
-                            onClick = { onClassificationChange(classOption) }
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            classOption.displayName,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun HeightInput(
-    heightCm: Float,
-    unit: HeightUnit,
-    onHeightChange: (Float) -> Unit,
-    onUnitChange: (HeightUnit) -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "Height",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.weight(1f)
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                HeightUnit.values().forEach { unitOption ->
-                    FilterChip(
-                        selected = unit == unitOption,
-                        onClick = { onUnitChange(unitOption) },
-                        label = { Text(unitOption.name) }
-                    )
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        when (unit) {
-            HeightUnit.CM -> {
-                Slider(
-                    value = heightCm,
-                    onValueChange = onHeightChange,
-                    valueRange = 50f..250f,
-                    modifier = Modifier.fillMaxWidth()
+                        bmiValue = bmi,
+                        category = category,
+                        createdAt = editingRecord?.createdAt ?: now,
+                        updatedAt = now
+                    ),
+                    isEdit = editingRecord != null
                 )
-                Text(
-                    "${heightCm.roundToInt()} cm",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
+                showSaveDialog = false
             }
-            HeightUnit.FT_IN -> {
-                val feet = (cmToFeet(heightCm)).toInt()
-                val inches = ((cmToFeet(heightCm) - feet) * 12).roundToInt()
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Feet", style = MaterialTheme.typography.bodySmall)
-                        Slider(
-                            value = feet.toFloat(),
-                            onValueChange = { newFeet ->
-                                onHeightChange(feetAndInchesToCm(newFeet.toInt(), inches))
-                            },
-                            valueRange = 2f..8f,
-                            steps = 5
-                        )
-                        Text(
-                            "$feet ft",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Inches", style = MaterialTheme.typography.bodySmall)
-                        Slider(
-                            value = inches.toFloat(),
-                            onValueChange = { newInches ->
-                                onHeightChange(feetAndInchesToCm(feet, newInches.toInt()))
-                            },
-                            valueRange = 0f..11f,
-                            steps = 10
-                        )
-                        Text(
-                            "$inches in",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun WeightInput(
-    weightKg: Float,
-    unit: WeightUnit,
-    onWeightChange: (Float) -> Unit,
-    onUnitChange: (WeightUnit) -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "Weight",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.weight(1f)
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                WeightUnit.values().forEach { unitOption ->
-                    FilterChip(
-                        selected = unit == unitOption,
-                        onClick = { onUnitChange(unitOption) },
-                        label = { Text(unitOption.name) }
-                    )
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        val displayValue = when (unit) {
-            WeightUnit.KG -> weightKg
-            WeightUnit.LBS -> kgToLbs(weightKg)
-        }
-        
-        val range = when (unit) {
-            WeightUnit.KG -> 20f..200f
-            WeightUnit.LBS -> 44f..440f
-        }
-        
-        Slider(
-            value = displayValue,
-            onValueChange = { newValue ->
-                onWeightChange(
-                    when (unit) {
-                        WeightUnit.KG -> newValue
-                        WeightUnit.LBS -> lbsToKg(newValue)
-                    }
-                )
-            },
-            valueRange = range,
-            modifier = Modifier.fillMaxWidth()
         )
-        
-        Text(
-            when (unit) {
-                WeightUnit.KG -> "${weightKg.roundToInt()} kg"
-                WeightUnit.LBS -> "${kgToLbs(weightKg).roundToInt()} lbs"
-            },
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center
+    }
+
+    pendingDelete?.let { item ->
+        ConfirmDeleteDialog(
+            title = "Delete BMI Record?",
+            message = "Delete \"${item.name}\" (BMI ${formatBMI(item.bmiValue)})?",
+            onDismiss = { pendingDelete = null },
+            onConfirm = {
+                viewModel.deleteRecord(item)
+                pendingDelete = null
+            }
         )
     }
 }
 
 @Composable
-fun BMIResultCard(bmiValue: Float, category: String) {
-    val categoryColor = Color(getBMICategoryColor(bmiValue))
-    
-    Card(
+private fun ResponsiveBMIGauge(bmi: Float, accent: Color) {
+    val track = MaterialTheme.colorScheme.surfaceVariant
+    BoxWithConstraints(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = categoryColor.copy(alpha = 0.1f)
-        )
+        contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                "Your BMI",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                formatBMI(bmiValue),
-                style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = 56.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = categoryColor
-            )
-            Text(
-                category,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = categoryColor
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                getBMIInterpretation(bmiValue, category),
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-}
-
-@Composable
-fun BMIGaugeCard(bmiValue: Float) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                "📊 BMI Scale",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            
-            BMIGauge(bmiValue)
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // BMI Categories Legend
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                WHOBMICategory.values().take(4).forEach { category ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(category.color))
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                category.displayName,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                        Text(
-                            "${formatBMI(category.minBMI)} - ${if (category.maxBMI == Float.MAX_VALUE) "∞" else formatBMI(category.maxBMI)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun BMIGauge(bmiValue: Float) {
-    val categories = listOf(
-        Triple(18.5f, Color(0xFF42A5F5), "Under"),
-        Triple(25f, Color(0xFF4CAF50), "Normal"),
-        Triple(30f, Color(0xFFFFA726), "Over"),
-        Triple(40f, Color(0xFFE53935), "Obese")
-    )
-    
-    // Clamp BMI for display
-    val displayBMI = bmiValue.coerceIn(15f, 40f)
-    val position = (displayBMI - 15f) / 25f // Normalize to 0-1 range
-    
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(80.dp)
-    ) {
-        // Color gradient bar
+        val diameter = (maxWidth * 0.65f).coerceIn(160.dp, 220.dp)
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(40.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(
-                    Brush.horizontalGradient(
-                        0f to Color(0xFF42A5F5),
-                        0.35f to Color(0xFF4CAF50),
-                        0.60f to Color(0xFFFFA726),
-                        1f to Color(0xFFE53935)
-                    )
-                )
-        )
-        
-        // BMI indicator
-        Box(
-            modifier = Modifier
-                .offset(x = (position * 100).coerceIn(0f, 100f).dp * 3.2f)
-                .align(Alignment.CenterStart)
+                .size(width = diameter, height = diameter * 0.62f),
+            contentAlignment = Alignment.BottomCenter
         ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeW = 14.dp.toPx()
+                val arcSize = androidx.compose.ui.geometry.Size(size.width - strokeW, (size.width - strokeW))
+                val topLeft = Offset(strokeW / 2f, strokeW / 2f)
+                drawArc(
+                    color = track,
+                    startAngle = 180f,
+                    sweepAngle = 180f,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeW, cap = StrokeCap.Round)
+                )
+                val normalized = ((bmi - 12f) / 30f).coerceIn(0f, 1f)
+                drawArc(
+                    color = accent,
+                    startAngle = 180f,
+                    sweepAngle = normalized * 180f,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeW, cap = StrokeCap.Round)
+                )
+                val angleRad = Math.toRadians((180f + normalized * 180f).toDouble())
+                val radius = arcSize.width / 2f
+                val cx = topLeft.x + radius
+                val cy = topLeft.y + radius
+                val tipX = cx + (radius * cos(angleRad)).toFloat()
+                val tipY = cy + (radius * sin(angleRad)).toFloat()
+                drawCircle(color = Color.White, radius = 6.dp.toPx(), center = Offset(tipX, tipY))
+                drawCircle(color = accent, radius = 4.dp.toPx(), center = Offset(tipX, tipY))
+            }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    Icons.Default.ArrowDropDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    shadowElevation = 4.dp
-                ) {
-                    Text(
-                        formatBMI(bmiValue),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun IdealWeightCard(heightCm: Float, gender: Gender) {
-    val weightCategories = getWeightCategoryTable(heightCm)
-    val (minIdeal, maxIdeal) = getIdealWeightRange(heightCm, gender)
-    
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                "⚖️ Weight Categories",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Text(
-                "Based on your height (${heightCm.roundToInt()} cm)",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            weightCategories.forEach { category ->
-                WeightCategoryRow(category)
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        "✅ Your Ideal Weight Range",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        "${minIdeal.roundToInt()} - ${maxIdeal.roundToInt()} kg",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        "${kgToLbs(minIdeal).roundToInt()} - ${kgToLbs(maxIdeal).roundToInt()} lbs",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun WeightCategoryRow(category: WeightCategory) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(category.color).copy(alpha = 0.1f))
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(Color(category.color))
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                category.category,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
-        }
-        
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                if (category.maxWeight == Float.MAX_VALUE)
-                    "> ${category.minWeight.roundToInt()} kg"
-                else
-                    "${category.minWeight.roundToInt()} - ${category.maxWeight.roundToInt()} kg",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Bold,
-                color = Color(category.color)
-            )
-            Text(
-                if (category.maxWeight == Float.MAX_VALUE)
-                    "> ${kgToLbs(category.minWeight).roundToInt()} lbs"
-                else
-                    "${kgToLbs(category.minWeight).roundToInt()} - ${kgToLbs(category.maxWeight).roundToInt()} lbs",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun HealthTipsCard(bmiValue: Float) {
-    val tips = getHealthTips(bmiValue)
-    
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                "💡 Health Tips",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            
-            tips.forEach { tip ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        tip,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun BMIHistoryView(
-    calculations: List<BMICalculation>,
-    onCalculationClick: (BMICalculation) -> Unit,
-    onCalculationDelete: (BMICalculation) -> Unit
-) {
-    if (calculations.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(32.dp)
-            ) {
-                Text("💪", fontSize = 80.sp)
-                Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "No Saved Calculations",
-                    style = MaterialTheme.typography.headlineSmall,
+                    text = formatBMI(bmi),
+                    style = MaterialTheme.typography.headlineLarge.merge(TabularNumberStyle),
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Calculate your BMI and save it to track progress",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    } else {
-        LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(calculations, key = { it.id }) { calculation ->
-                BMIHistoryCard(
-                    calculation = calculation,
-                    onClick = { onCalculationClick(calculation) },
-                    onDelete = { onCalculationDelete(calculation) }
-                )
+                Text("kg/m²", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
 
 @Composable
-fun BMIHistoryCard(
-    calculation: BMICalculation,
-    onClick: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val categoryColor = Color(getBMICategoryColor(calculation.bmiValue))
-    
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(categoryColor.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    formatBMI(calculation.bmiValue),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = categoryColor
-                )
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    calculation.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    calculation.category,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = categoryColor
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "${calculation.gender.displayName} • ${calculation.age}y • ${calculation.heightCm.roundToInt()}cm • ${calculation.weightKg.roundToInt()}kg",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SaveBMIDialog(
-    bmiValue: Float,
-    category: String,
+private fun SaveBMIDialog(
+    existing: BMICalculation?,
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit
+    onConfirm: (String) -> Unit
 ) {
-    var name by remember { mutableStateOf("My BMI") }
-    
+    var name by remember { mutableStateOf(existing?.name ?: "My BMI") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Save, contentDescription = null) },
-        title = { Text("Save BMI Calculation") },
+        title = { Text(if (existing == null) "Save BMI Record" else "Edit BMI Record") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "BMI: ${formatBMI(bmiValue)} ($category)",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name") },
-                    placeholder = { Text("e.g., January 2025") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-            }
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Profile / Note") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
         },
         confirmButton = {
             Button(
-                onClick = { if (name.isNotBlank()) onSave(name) },
-                enabled = name.isNotBlank()
-            ) {
-                Text("Save")
-            }
+                enabled = name.isNotBlank(),
+                onClick = { onConfirm(name.trim()) }
+            ) { Text("Save") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
-

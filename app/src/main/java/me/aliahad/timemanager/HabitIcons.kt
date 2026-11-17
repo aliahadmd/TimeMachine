@@ -1,6 +1,8 @@
 package me.aliahad.timemanager
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -13,11 +15,11 @@ data class HabitIcon(
 
 val habitIcons = listOf(
     HabitIcon("fitness_center", Icons.Default.FitnessCenter, "Fitness"),
-    HabitIcon("directions_run", Icons.Default.DirectionsRun, "Running"),
+    HabitIcon("directions_run", Icons.AutoMirrored.Filled.DirectionsRun, "Running"),
     HabitIcon("self_improvement", Icons.Default.SelfImprovement, "Meditation"),
     HabitIcon("local_drink", Icons.Default.LocalDrink, "Hydration"),
     HabitIcon("restaurant", Icons.Default.Restaurant, "Healthy Eating"),
-    HabitIcon("menu_book", Icons.Default.MenuBook, "Reading"),
+    HabitIcon("menu_book", Icons.AutoMirrored.Filled.MenuBook, "Reading"),
     HabitIcon("edit_note", Icons.Default.EditNote, "Writing"),
     HabitIcon("school", Icons.Default.School, "Learning"),
     HabitIcon("brush", Icons.Default.Brush, "Art"),

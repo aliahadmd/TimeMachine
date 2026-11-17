@@ -1,10 +1,8 @@
 package me.aliahad.timemanager
 
 /**
- * Constants for activity category customization
+ * Canonical customization constants for Focus activity categories.
  */
-
-// Icon options for categories
 object ActivityIcons {
     val ICONS = listOf(
         "📚" to "Books",
@@ -34,25 +32,23 @@ object ActivityIcons {
     )
 }
 
-// Color options for categories
 object CategoryColors {
     val COLORS = listOf(
-        0xFFFF6B6B to "Red",
-        0xFFFF8C42 to "Orange",
-        0xFFFFA07A to "Light Orange",
-        0xFFFFD93D to "Yellow",
-        0xFF6BCB77 to "Green",
-        0xFF4DABF7 to "Blue",
-        0xFF9775FA to "Purple",
-        0xFFFF6B9D to "Pink",
-        0xFFFF8FAB to "Light Pink",
-        0xFFE599F7 to "Violet",
-        0xFF66D9EF to "Cyan",
-        0xFF69DB7C to "Light Green",
-        0xFFFFA94D to "Amber",
-        0xFFFA5252 to "Dark Red",
-        0xFF845EF7 to "Indigo",
-        0xFFFF6347 to "Tomato"
+        0xFFFF6B6BL to "Red",
+        0xFFFF8C42L to "Orange",
+        0xFFFFA07AL to "Light Orange",
+        0xFFFFD93DL to "Yellow",
+        0xFF6BCB77L to "Green",
+        0xFF4DABF7L to "Blue",
+        0xFF9775FAL to "Purple",
+        0xFFFF6B9DL to "Pink",
+        0xFFFF8FABL to "Light Pink",
+        0xFFE599F7L to "Violet",
+        0xFF66D9EFL to "Cyan",
+        0xFF69DB7CL to "Light Green",
+        0xFFFFA94DL to "Amber",
+        0xFFFA5252L to "Dark Red",
+        0xFF845EF7L to "Indigo",
+        0xFFFF6347L to "Tomato"
     )
 }
-

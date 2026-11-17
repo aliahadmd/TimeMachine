@@ -1,11 +1,4 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
-
-# Keep line numbers for better crash reports
+# Keep line numbers for crash reports
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
 
@@ -16,6 +9,24 @@
     @androidx.compose.runtime.Composable *;
 }
 
+# Kotlin Serialization (BackupData, Navigation routes)
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.SerializationKt
+-keep,includedescriptorclasses class me.aliahad.timemanager.**$$serializer { *; }
+-keepclassmembers class me.aliahad.timemanager.** {
+    *** Companion;
+}
+
+# Room & DataStore
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-keepclassmembers class * extends androidx.room.RoomDatabase {
+    <init>(...);
+}
+
+# Jetpack Glance
+-keep class androidx.glance.** { *; }
+
 # Keep Kotlin Coroutines
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
@@ -23,17 +34,5 @@
     volatile <fields>;
 }
 
-# Keep MediaPlayer and Vibrator
--keep class android.media.MediaPlayer { *; }
--keep class android.os.Vibrator { *; }
--keep class android.os.VibrationEffect { *; }
-
 # Material 3
 -keep class com.google.android.material.** { *; }
-
-# Remove logging in release
--assumenosideeffects class android.util.Log {
-    public static *** d(...);
-    public static *** v(...);
-    public static *** i(...);
-}

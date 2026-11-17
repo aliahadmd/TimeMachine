@@ -25,6 +25,6 @@ data class Expense(
     val description: String,
     val date: String, // Format: yyyy-MM-dd
     val timestamp: Long = System.currentTimeMillis(),
-    val paymentMethod: String = "Cash" // Cash, Card, Online, Other
+    val paymentMethod: String = "Cash", // Cash, Card, Online, Other
+    val subscriptionId: Long? = null
 )
-

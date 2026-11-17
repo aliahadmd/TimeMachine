@@ -10,8 +10,8 @@ data class HabitReminderMetadata(
 )
 
 /**
- * Lightweight persistence for active habit reminders so we can rebuild alarms after
- * reboots, app updates, or when the app process is killed.
+ * Lightweight persistence index for scheduled habit reminders so alarms can be
+ * rebuilt deterministically after reboot, package replacement, or Clear All Data.
  */
 object ReminderRegistry {
 
@@ -19,17 +19,12 @@ object ReminderRegistry {
     private const val KEY_ENTRIES = "entries"
 
     fun saveReminder(context: Context, habit: Habit) {
+        val hour = habit.reminderTimeHour ?: return
+        val minute = habit.reminderTimeMinute ?: return
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val entries = prefs.getStringSet(KEY_ENTRIES, emptySet())?.toMutableSet() ?: mutableSetOf()
-        val entry = buildString {
-            append(habit.id)
-            append("|")
-            append(habit.reminderTimeHour)
-            append("|")
-            append(habit.reminderTimeMinute)
-        }
         entries.removeIf { it.startsWith("${habit.id}|") }
-        entries.add(entry)
+        entries.add("${habit.id}|$hour|$minute")
         prefs.edit().putStringSet(KEY_ENTRIES, entries).apply()
     }
 
@@ -52,12 +47,15 @@ object ReminderRegistry {
                 val minute = parts[2].toIntOrNull()
                 if (id != null && hour != null && minute != null) {
                     HabitReminderMetadata(id, hour, minute)
-                } else {
-                    null
-                }
-            } else {
-                null
-            }
+                } else null
+            } else null
         }
+    }
+
+    fun clearAll(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .apply()
     }
 }

@@ -1,4 +1,15 @@
 <resources>
     <string name="app_name">TimeMachine</string>
-    <string name="focus_tracker_widget_description">Track your focus time with real-time progress updates</string>
+    <string name="focus_tracker_widget_description">Track today\'s Focus progress and launch a timer in one tap</string>
+    <string name="habits_widget_description">View and check off today\'s scheduled habits from your home screen</string>
+    <string name="widget_today_focus_label">Today\'s Focus</string>
+    <string name="widget_today_habits_label">Today\'s Habits</string>
+    <string name="qs_tile_focus_label">Focus Timer</string>
+    <string name="qs_tile_screen_time_label">Screen Time</string>
+    <string name="shortcut_focus_short">Focus</string>
+    <string name="shortcut_focus_long">Start Focus Timer</string>
+    <string name="shortcut_task_short">Planner</string>
+    <string name="shortcut_task_long">Open Daily Planner</string>
+    <string name="shortcut_expense_short">Finance</string>
+    <string name="shortcut_expense_long">Track Expenses &amp; Subs</string>
 </resources>

@@ -10,6 +10,10 @@ data class Preset(
     val name: String,
     val hours: Int,
     val minutes: Int,
+    val breakMinutes: Int = 5,
+    val isPomodoro: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
-)
-
+) {
+    val totalFocusMinutes: Int
+        get() = (hours * 60) + minutes
+}

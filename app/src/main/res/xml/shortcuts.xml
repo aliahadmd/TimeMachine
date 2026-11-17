@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="start_focus"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_focus_short"
+        android:shortcutLongLabel="@string/shortcut_focus_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="me.aliahad.timemanager"
+            android:targetClass="me.aliahad.timemanager.MainActivity">
+            <extra android:name="tm_route_target" android:value="focus" />
+            <extra android:name="tm_auto_start_focus" android:value="true" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="add_task"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_task_short"
+        android:shortcutLongLabel="@string/shortcut_task_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="me.aliahad.timemanager"
+            android:targetClass="me.aliahad.timemanager.MainActivity">
+            <extra android:name="tm_route_target" android:value="planner" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="add_expense"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_expense_short"
+        android:shortcutLongLabel="@string/shortcut_expense_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="me.aliahad.timemanager"
+            android:targetClass="me.aliahad.timemanager.MainActivity">
+            <extra android:name="tm_route_target" android:value="finance" />
+        </intent>
+    </shortcut>
+</shortcuts>

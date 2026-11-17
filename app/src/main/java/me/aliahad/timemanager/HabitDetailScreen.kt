@@ -1,657 +1,453 @@
 package me.aliahad.timemanager
 
-import android.content.Context
-import android.os.VibrationEffect
-import android.os.Vibrator
-import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.statusBarsPadding
-import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import me.aliahad.timemanager.core.common.SafeDateTime
+import me.aliahad.timemanager.core.common.toComposeColor
+import me.aliahad.timemanager.core.di.appViewModel
 import me.aliahad.timemanager.data.CompletionType
-import me.aliahad.timemanager.data.HabitRepository
+import me.aliahad.timemanager.data.HabitCompletion
+import me.aliahad.timemanager.ui.components.SectionCard
+import me.aliahad.timemanager.ui.components.TimeMachineTopBar
+import me.aliahad.timemanager.ui.theme.TimeMachineTheme
+import me.aliahad.timemanager.ui.viewmodel.HabitDetailViewModel
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
-import java.util.*
+import java.time.temporal.TemporalAdjusters
 
 @Composable
 fun HabitDetailScreen(
     habitId: Long,
-    repository: HabitRepository,
     onBack: () -> Unit
 ) {
-    val context = LocalContext.current
-    val vibrator = remember { context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator }
-    val scope = rememberCoroutineScope()
-    
-    val habitStats by repository.getHabitWithStats(habitId).collectAsState(initial = null)
-    val completions by repository.getHabitCompletions(habitId).collectAsState(initial = emptyList())
-    
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var showEditDialog by remember { mutableStateOf(false) }
-    
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        habitStats?.let { stats ->
-            val habit = stats.habit
-            
-            LazyColumn(
-                modifier = Modifier.fillMaxSize()
+    val viewModel = appViewModel(key = "habit_detail_$habitId") { container ->
+        HabitDetailViewModel(container, habitId)
+    }
+    val habitStats by viewModel.habitWithStats.collectAsStateWithLifecycle()
+    val completions by viewModel.completions.collectAsStateWithLifecycle()
+    val focusCategories by viewModel.activeFocusCategories.collectAsStateWithLifecycle()
+
+    var currentMonth by remember { mutableStateOf(YearMonth.now()) }
+    var editingDateIso by remember { mutableStateOf<String?>(null) }
+    var showEditHabit by remember { mutableStateOf(false) }
+    var showRemoveChoice by remember { mutableStateOf(false) }
+
+    val stats = habitStats
+    val statusColors = TimeMachineTheme.statusColors
+
+    Scaffold(
+        topBar = {
+            TimeMachineTopBar(
+                title = stats?.habit?.name ?: "Habit Details",
+                subtitle = stats?.let { "${it.habit.type.name} • Goal ${it.habit.goalPeriodDays} days" },
+                onBack = onBack,
+                actions = {
+                    if (stats != null) {
+                        IconButton(onClick = { showEditHabit = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit Habit")
+                        }
+                        IconButton(onClick = { showRemoveChoice = true }) {
+                            Icon(
+                                Icons.Default.DeleteForever,
+                                contentDescription = "Archive or Delete",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        if (stats == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
             ) {
-                // Header with back, edit, and delete
-                item {
+                Text("Loading habit details...")
+            }
+            return@Scaffold
+        }
+
+        val habit = stats.habit
+        val accent = habit.color.toComposeColor()
+        val completionsByDate = remember(completions) { completions.associateBy { it.date } }
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item(key = "detail_stats") {
+                SectionCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = accent.copy(alpha = 0.16f),
+                            modifier = Modifier.size(46.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = getIconByName(habit.iconName),
+                                    contentDescription = null,
+                                    tint = accent,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(habit.name, style = MaterialTheme.typography.titleLarge)
+                            if (habit.description.isNotBlank()) {
+                                Text(
+                                    habit.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        DetailMetric("Current Streak", "${stats.currentStreak}d")
+                        DetailMetric("Best Streak", "${stats.longestStreak}d")
+                        DetailMetric("Scheduled Rate", "${(stats.completionRate * 100).toInt()}%")
+                        DetailMetric("Success Rate", "${(stats.successRate * 100).toInt()}%")
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Goal Period Progress", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "${stats.totalAchieved} / ${habit.goalPeriodDays} days",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { stats.goalProgress },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = accent,
+                        strokeCap = StrokeCap.Round
+                    )
+                }
+            }
+
+            item(key = "interactive_calendar") {
+                val today = LocalDate.now()
+                val firstDay = currentMonth.atDay(1)
+                val startOffset = firstDay.dayOfWeek.value - 1
+                val totalDays = currentMonth.lengthOfMonth()
+                val rows = (startOffset + totalDays + 6) / 7
+
+                SectionCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, "Back")
+                        IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Prev month")
                         }
-                        
-                        Row {
-                            IconButton(onClick = { showEditDialog = true }) {
-                                Icon(
-                                    Icons.Default.Edit,
-                                    "Edit",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            
-                            IconButton(onClick = { showDeleteDialog = true }) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    "Delete",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                    }
-                }
-                
-                // Habit Info
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(96.dp)
-                                .clip(CircleShape)
-                                .background(Color(habit.color))
-                        ) {
-                            Icon(
-                                imageVector = getIconByName(habit.iconName),
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .align(Alignment.Center),
-                                tint = Color.White
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                "Tap any day to log or edit",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        Text(
-                            text = habit.name,
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            textAlign = TextAlign.Center
-                        )
-                        
-                        if (habit.description.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(8.dp))
+                        IconButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        listOf("M", "T", "W", "T", "F", "S", "S").forEach { d ->
                             Text(
-                                text = habit.description,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                text = d,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
                                 textAlign = TextAlign.Center
                             )
                         }
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Text(
-                                text = if (habit.type == me.aliahad.timemanager.data.HabitType.BUILD) "Build Habit" else "Quit Habit",
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.SemiBold
-                                ),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
                     }
-                }
-                
-                // Stats Grid
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Statistics",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                        
-                        // Row 1: Streaks
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            StatCard(
-                                title = "Current",
-                                value = "${stats.currentStreak}",
-                                subtitle = "day streak",
-                                icon = Icons.Default.LocalFireDepartment,
-                                color = Color(0xFFFF6B6B),
-                                modifier = Modifier.weight(1f)
-                            )
-                            
-                            StatCard(
-                                title = "Best",
-                                value = "${stats.longestStreak}",
-                                subtitle = "days",
-                                icon = Icons.Default.Star,
-                                color = Color(0xFFFFD93D),
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        
-                        // Row 2: Completions
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            StatCard(
-                                title = "Achieved",
-                                value = "${stats.totalAchieved}",
-                                subtitle = "days",
-                                icon = Icons.Default.CheckCircle,
-                                color = Color(0xFF4CAF50),
-                                modifier = Modifier.weight(1f)
-                            )
-                            
-                            StatCard(
-                                title = "Gave Up",
-                                value = "${stats.totalGaveUp}",
-                                subtitle = "days",
-                                icon = Icons.Default.Cancel,
-                                color = Color(0xFFE57373),
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        
-                        // Row 3: Rates
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            StatCard(
-                                title = "Success",
-                                value = "${(stats.successRate * 100).toInt()}%",
-                                subtitle = "of submissions",
-                                icon = Icons.Default.TrendingUp,
-                                color = Color(0xFF6BCF7F),
-                                modifier = Modifier.weight(1f)
-                            )
-                            
-                            StatCard(
-                                title = "Activity",
-                                value = "${(stats.completionRate * 100).toInt()}%",
-                                subtitle = "consistency",
-                                icon = Icons.Default.Timeline,
-                                color = Color(0xFF64B5F6),
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-                
-                // GitHub Heatmap
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "Activity - Last 90 Days",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        )
-                        
-                        GitHubStyleHeatmap(
-                            completions = completions,
-                            habitColor = Color(habit.color)
-                        )
-                    }
-                }
-                
-                // Calendar
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "This Month",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        )
-                        
-                        MonthCalendarView(
-                            completions = completions,
-                            habitColor = Color(habit.color)
-                        )
-                    }
-                }
-                
-                // Bottom spacing
-                item {
-                    Spacer(modifier = Modifier.height(40.dp))
-                }
-            }
-        }
-    }
-    
-    // Edit dialog
-    if (showEditDialog) {
-        habitStats?.let { stats ->
-            EditHabitDialog(
-                habit = stats.habit,
-                onDismiss = { showEditDialog = false },
-                onSave = { updatedHabit ->
-                    scope.launch {
-                        vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
-                        
-                        // Cancel old reminder
-                        NotificationScheduler.cancelHabitReminder(context, updatedHabit.id)
-                        
-                        // Update habit in database
-                        repository.updateHabit(updatedHabit)
-                        
-                        // Schedule new reminder if enabled
-                        if (updatedHabit.reminderTimeHour != null && updatedHabit.reminderTimeMinute != null) {
-                            NotificationScheduler.scheduleHabitReminder(context, updatedHabit)
-                        }
-                        
-                        showEditDialog = false
-                    }
-                }
-            )
-        }
-    }
-    
-    // Delete confirmation dialog
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            icon = {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error
-                )
-            },
-            title = {
-                Text("Delete Habit?")
-            },
-            text = {
-                Text("This will permanently delete this habit and all its history. This action cannot be undone.")
-            },
-            confirmButton = {
-                    TextButton(
-                        onClick = {
-                            scope.launch {
-                                vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
-                                habitStats?.let {
-                                    // Cancel reminder
-                                    NotificationScheduler.cancelHabitReminder(context, it.habit.id)
-                                    repository.deleteHabit(it.habit)
-                                }
-                                showDeleteDialog = false
-                                onBack()
-                            }
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Delete")
-                    }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-}
-
-@Composable
-fun StatCard(
-    title: String,
-    value: String,
-    subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = color.copy(alpha = 0.1f)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = color
-            )
-            
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold
-                ),
-                color = color
-            )
-            
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun GitHubStyleHeatmap(
-    completions: List<me.aliahad.timemanager.data.HabitCompletion>,
-    habitColor: Color
-) {
-    val completionMap = completions.associateBy { it.date }
-    val today = LocalDate.now()
-    val startDate = today.minusDays(89)
-    
-    val weeks = mutableListOf<List<LocalDate>>()
-    var currentWeek = mutableListOf<LocalDate>()
-    var currentDate = startDate
-    
-    while (currentDate <= today) {
-        currentWeek.add(currentDate)
-        if (currentDate.dayOfWeek == java.time.DayOfWeek.SUNDAY || currentDate == today) {
-            weeks.add(currentWeek.toList())
-            currentWeek = mutableListOf()
-        }
-        currentDate = currentDate.plusDays(1)
-    }
-    
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Weekday labels
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Spacer(modifier = Modifier.width(24.dp))
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                weeks.forEach { week ->
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        week.forEach { date ->
-                            val dateString = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                            val completion = completionMap[dateString]
-                            
-                            Box(
-                                modifier = Modifier
-                                    .size(12.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(
-                                        when (completion?.completionType) {
-                                            me.aliahad.timemanager.data.CompletionType.ACHIEVED -> Color(0xFF4CAF50)
-                                            me.aliahad.timemanager.data.CompletionType.GAVE_UP -> Color(0xFFE57373)
-                                            else -> MaterialTheme.colorScheme.surfaceVariant
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        repeat(rows) { row ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                repeat(7) { col ->
+                                    val dayNum = row * 7 + col - startOffset + 1
+                                    if (dayNum in 1..totalDays) {
+                                        val date = currentMonth.atDay(dayNum)
+                                        val iso = date.format(SafeDateTime.ISO_DATE)
+                                        val entry = completionsByDate[iso]
+                                        val isFuture = date.isAfter(today)
+                                        val bg = when (entry?.completionType) {
+                                            CompletionType.ACHIEVED -> statusColors.success
+                                            CompletionType.GAVE_UP -> statusColors.danger
+                                            null -> if (date == today) MaterialTheme.colorScheme.primaryContainer
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                                         }
-                                    )
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Legend
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Color(0xFF4CAF50))
-                    )
-                    Text(
-                        text = "Achieved",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-                
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Color(0xFFE57373))
-                    )
-                    Text(
-                        text = "Gave Up",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun MonthCalendarView(
-    completions: List<me.aliahad.timemanager.data.HabitCompletion>,
-    habitColor: Color
-) {
-    val completionMap = completions.associateBy { it.date }
-    val currentMonth = remember { YearMonth.now() }
-    val firstDayOfMonth = currentMonth.atDay(1)
-    val lastDayOfMonth = currentMonth.atEndOfMonth()
-    val startDayOfWeek = firstDayOfMonth.dayOfWeek.value % 7
-    
-    val today = LocalDate.now()
-    
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = currentMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + currentMonth.year,
-            style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.SemiBold
-            ),
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        
-        // Weekday headers
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
-                Text(
-                    text = day,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-        
-        // Calendar grid - using Column/Row instead of LazyVerticalGrid to avoid nested scrolling
-        val allDays = mutableListOf<LocalDate?>()
-        
-        // Add empty slots for days before first day of month
-        repeat(startDayOfWeek) {
-            allDays.add(null)
-        }
-        
-        // Add all days of the month
-        for (day in 1..lastDayOfMonth.dayOfMonth) {
-            allDays.add(currentMonth.atDay(day))
-        }
-        
-        // Create rows of 7 days
-        val rows = allDays.chunked(7)
-        
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            rows.forEach { row ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    row.forEach { date ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                        ) {
-                            if (date != null) {
-                                val dateString = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                                val completion = completionMap[dateString]
-                                val isToday = date == today
-                                
-                                Surface(
-                                    modifier = Modifier.fillMaxSize(),
-                                    shape = CircleShape,
-                                    color = when (completion?.completionType) {
-                                        me.aliahad.timemanager.data.CompletionType.ACHIEVED -> Color(0xFF4CAF50)
-                                        me.aliahad.timemanager.data.CompletionType.GAVE_UP -> Color(0xFFE57373)
-                                        else -> if (isToday)
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        else
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                                    },
-                                    border = if (isToday)
-                                        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-                                    else null
-                                ) {
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        Text(
-                                            text = date.dayOfMonth.toString(),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = when (completion?.completionType) {
-                                                me.aliahad.timemanager.data.CompletionType.ACHIEVED,
-                                                me.aliahad.timemanager.data.CompletionType.GAVE_UP -> Color.White
-                                                else -> MaterialTheme.colorScheme.onSurface
-                                            },
-                                            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
-                                        )
+                                        val fg = if (entry != null) Color.White else MaterialTheme.colorScheme.onSurface
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = bg,
+                                            border = if (date == today) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(38.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable(enabled = !isFuture) { editingDateIso = iso }
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = dayNum.toString(),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = if (date == today) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isFuture) fg.copy(alpha = 0.35f) else fg
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Spacer(modifier = Modifier.weight(1f).height(38.dp))
                                     }
                                 }
                             }
                         }
                     }
-                    // Fill remaining slots in the row
-                    repeat(7 - row.size) {
-                        Box(modifier = Modifier.weight(1f).aspectRatio(1f))
+                }
+            }
+
+            item(key = "heatmap_90") {
+                SectionCard {
+                    Text("90-Day Consistency Map", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    AlignedNinetyDayHeatmap(completionsByDate = completionsByDate, accent = accent)
+                }
+            }
+
+            val notesEntries = completions.filter { it.notes.isNotBlank() }
+            if (notesEntries.isNotEmpty()) {
+                item(key = "notes_header") {
+                    Text("Journal Notes", style = MaterialTheme.typography.titleMedium)
+                }
+                items(notesEntries.take(20), key = { "${it.habitId}_${it.date}" }) { entry ->
+                    SectionCard {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                SafeDateTime.formatRelativeDate(entry.date),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                if (entry.completionType == CompletionType.ACHIEVED) "Achieved" else "Gave Up",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (entry.completionType == CompletionType.ACHIEVED) statusColors.success else statusColors.danger
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(entry.notes, style = MaterialTheme.typography.bodySmall)
                     }
+                }
+            }
+        }
+
+        editingDateIso?.let { dateIso ->
+            val existing = completionsByDate[dateIso]
+            HabitCheckInDialog(
+                habitName = habit.name,
+                dateLabel = SafeDateTime.formatRelativeDate(dateIso) + " ($dateIso)",
+                initialType = existing?.completionType ?: CompletionType.ACHIEVED,
+                initialNotes = existing?.notes ?: "",
+                canClearExisting = existing != null,
+                onDismiss = { editingDateIso = null },
+                onClear = { viewModel.clearCompletionForDate(dateIso) },
+                onSubmit = { type, notes ->
+                    viewModel.saveCompletionForDate(dateIso, type, notes)
+                    editingDateIso = null
+                }
+            )
+        }
+
+        if (showEditHabit) {
+            HabitEditorDialog(
+                existingHabit = habit,
+                focusCategories = focusCategories,
+                onDismiss = { showEditHabit = false },
+                onSave = { updated, _ ->
+                    viewModel.updateHabit(updated)
+                    showEditHabit = false
+                }
+            )
+        }
+
+        if (showRemoveChoice) {
+            AlertDialog(
+                onDismissRequest = { showRemoveChoice = false },
+                title = { Text("Remove \"${habit.name}\"?") },
+                text = {
+                    Text("Archiving keeps past streak history while stopping future reminders. Permanent deletion erases all check-ins forever.")
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.archiveHabit()
+                            showRemoveChoice = false
+                            onBack()
+                        }
+                    ) {
+                        Icon(Icons.Default.Archive, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Archive")
+                    }
+                },
+                dismissButton = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { showRemoveChoice = false }) { Text("Cancel") }
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.deletePermanently(habit)
+                                showRemoveChoice = false
+                                onBack()
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Delete Forever")
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailMetric(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun AlignedNinetyDayHeatmap(
+    completionsByDate: Map<String, HabitCompletion>,
+    accent: Color
+) {
+    val today = LocalDate.now()
+    val earliest = today.minusDays(89)
+    val startMonday = earliest.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    val weeks = mutableListOf<List<LocalDate>>()
+    var cursor = startMonday
+    while (!cursor.isAfter(today)) {
+        val week = (0L..6L).map { cursor.plusDays(it) }
+        weeks += week
+        cursor = cursor.plusWeeks(1)
+    }
+    val statusColors = TimeMachineTheme.statusColors
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        weeks.forEach { week ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                week.forEach { day ->
+                    val iso = day.format(SafeDateTime.ISO_DATE)
+                    val inRange = !day.isBefore(earliest) && !day.isAfter(today)
+                    val entry = if (inRange) completionsByDate[iso] else null
+                    val boxColor = when {
+                        !inRange -> Color.Transparent
+                        entry?.completionType == CompletionType.ACHIEVED -> accent
+                        entry?.completionType == CompletionType.GAVE_UP -> statusColors.danger
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(3.dp),
+                        color = boxColor,
+                        modifier = Modifier.size(14.dp)
+                    ) {}
                 }
             }
         }
     }
 }
-

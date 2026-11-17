@@ -3,11 +3,14 @@ package me.aliahad.timemanager.data
 import kotlinx.serialization.Serializable
 
 /**
- * Complete backup data structure for the entire app ecosystem
+ * Complete backup schema for TimeMachine.
+ * Version 1: Original TimeMachine v3.0.0 format (backward-compatible reader).
+ * Version 2: Adds Presets, ScreenTime tables, Session notes/createdAt/linkedTaskId,
+ *            Habit schedules/links, Subscription currencyCode/autoLogExpense, and DailyTask links.
  */
 @Serializable
 data class BackupData(
-    val version: Int = 1,
+    val version: Int = 2,
     val timestamp: Long = System.currentTimeMillis(),
     val profile: UserProfileBackup? = null,
     val focusTracker: FocusTrackerBackup = FocusTrackerBackup(),
@@ -16,22 +19,24 @@ data class BackupData(
     val subscriptionTracker: SubscriptionTrackerBackup = SubscriptionTrackerBackup(),
     val dailyPlanner: DailyPlannerBackup = DailyPlannerBackup(),
     val yearCalculator: YearCalculatorBackup = YearCalculatorBackup(),
-    val bmiCalculator: BMICalculatorBackup = BMICalculatorBackup()
+    val bmiCalculator: BMICalculatorBackup = BMICalculatorBackup(),
+    val screenTime: ScreenTimeBackup = ScreenTimeBackup()
 )
 
 @Serializable
 data class UserProfileBackup(
     val id: Long = 0,
-    val name: String = "",
+    val name: String = "User",
     val email: String = "",
     val bio: String = "",
-    val avatarIcon: String = "",
+    val avatarIcon: String = "👤",
     val joinDate: Long = 0,
-    val dailyGoalMinutes: Int = 0,
-    val theme: String = "",
-    val currency: String = "",
+    val dailyGoalMinutes: Int = 120,
+    val theme: String = "Auto",
+    val currency: String = "৳",
+    val currencyCode: String = "",
     val notificationsEnabled: Boolean = true,
-    val weekStartDay: String = "",
+    val weekStartDay: String = "Monday",
     val createdAt: Long = 0,
     val updatedAt: Long = 0
 )
@@ -39,7 +44,19 @@ data class UserProfileBackup(
 @Serializable
 data class FocusTrackerBackup(
     val categories: List<CategoryBackup> = emptyList(),
-    val sessions: List<SessionBackup> = emptyList()
+    val sessions: List<SessionBackup> = emptyList(),
+    val presets: List<PresetBackup> = emptyList()
+)
+
+@Serializable
+data class PresetBackup(
+    val id: Long = 0,
+    val name: String,
+    val hours: Int,
+    val minutes: Int,
+    val breakMinutes: Int = 5,
+    val isPomodoro: Boolean = false,
+    val createdAt: Long = 0
 )
 
 @Serializable
@@ -62,7 +79,10 @@ data class SessionBackup(
     val startTime: Long,
     val endTime: Long,
     val durationMinutes: Int,
-    val date: String
+    val date: String,
+    val notes: String = "",
+    val linkedTaskId: Long? = null,
+    val createdAt: Long = 0
 )
 
 @Serializable
@@ -81,8 +101,12 @@ data class HabitBackup(
     val habitType: String,
     val goalPeriodDays: Int,
     val isEveryday: Boolean,
+    val scheduledDays: String = "1,2,3,4,5,6,7",
     val reminderTimeHour: Int?,
     val reminderTimeMinute: Int?,
+    val linkedFocusCategoryId: Long? = null,
+    val linkType: String = "MANUAL",
+    val linkedTargetValue: Int = 0,
     val isActive: Boolean,
     val createdAt: Long
 )
@@ -120,7 +144,8 @@ data class ExpenseBackup(
     val description: String,
     val date: String,
     val timestamp: Long,
-    val paymentMethod: String
+    val paymentMethod: String,
+    val subscriptionId: Long? = null
 )
 
 @Serializable
@@ -133,6 +158,8 @@ data class SubscriptionBackup(
     val id: Long,
     val name: String,
     val cost: Double,
+    val currency: String = "৳",
+    val currencyCode: String = "",
     val billingCycle: String,
     val startDate: String,
     val nextBillingDate: String,
@@ -145,7 +172,9 @@ data class SubscriptionBackup(
     val isActive: Boolean,
     val isTrial: Boolean,
     val trialEndDate: String? = null,
-    val reminderDaysBefore: Int
+    val reminderDaysBefore: Int,
+    val expenseCategoryId: Long? = null,
+    val autoLogExpense: Boolean = false
 )
 
 @Serializable
@@ -171,6 +200,8 @@ data class DailyTaskBackup(
     val recurringDays: String,
     val reminderMinutes: Int,
     val notes: String,
+    val linkedCategoryId: Long? = null,
+    val linkedSessionId: Long? = null,
     val createdAt: Long
 )
 
@@ -210,3 +241,44 @@ data class BMICalculationBackupData(
     val updatedAt: Long
 )
 
+@Serializable
+data class ScreenTimeBackup(
+    val sessions: List<ScreenTimeSessionBackup> = emptyList(),
+    val dailySummaries: List<ScreenTimeDailySummaryBackup> = emptyList(),
+    val hourlyData: List<ScreenTimeHourlyBackup> = emptyList()
+)
+
+@Serializable
+data class ScreenTimeSessionBackup(
+    val date: String,
+    val timestamp: Long,
+    val sessionStart: Long,
+    val sessionEnd: Long,
+    val durationSeconds: Int,
+    val unlockCount: Int = 1,
+    val wasWalking: Boolean = false,
+    val appUsed: String? = null
+)
+
+@Serializable
+data class ScreenTimeDailySummaryBackup(
+    val date: String,
+    val totalScreenTimeSeconds: Int,
+    val pickupsCount: Int,
+    val firstPickupTime: Long? = null,
+    val lastPickupTime: Long? = null,
+    val walkingScreenTimeSeconds: Int = 0,
+    val avgSessionDurationSeconds: Int,
+    val longestSessionSeconds: Int,
+    val shortestSessionSeconds: Int,
+    val notificationsCount: Int = 0,
+    val updatedAt: Long
+)
+
+@Serializable
+data class ScreenTimeHourlyBackup(
+    val date: String,
+    val hour: Int,
+    val screenTimeSeconds: Int,
+    val pickupsCount: Int
+)

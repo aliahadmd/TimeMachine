@@ -1,846 +1,365 @@
 package me.aliahad.timemanager
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import me.aliahad.timemanager.core.di.appViewModel
 import me.aliahad.timemanager.data.DateCalculation
 import me.aliahad.timemanager.data.DateCategories
-import me.aliahad.timemanager.data.TimerDatabase
+import me.aliahad.timemanager.ui.components.ConfirmDeleteDialog
+import me.aliahad.timemanager.ui.components.EmptyStateView
+import me.aliahad.timemanager.ui.components.M3DatePickerModal
+import me.aliahad.timemanager.ui.components.SectionCard
+import me.aliahad.timemanager.ui.components.TimeMachineTopBar
+import me.aliahad.timemanager.ui.theme.TabularNumberStyle
+import me.aliahad.timemanager.ui.viewmodel.YearCalculatorViewModel
 import java.time.LocalDate
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun YearCalculatorScreen(onNavigateBack: () -> Unit) {
-    val context = LocalContext.current
-    val database = remember { TimerDatabase.getDatabase(context) }
-    val dateCalculationDao = database.dateCalculationDao()
-    val scope = rememberCoroutineScope()
-    
-    val savedCalculations by dateCalculationDao.getAllCalculations().collectAsState(initial = emptyList())
-    
-    var showCalculator by remember { mutableStateOf(false) }
+    val viewModel = appViewModel { container -> YearCalculatorViewModel(container) }
+    val savedList by viewModel.savedCalculations.collectAsStateWithLifecycle()
+
+    var modeIndex by rememberSaveable { mutableIntStateOf(0) } // 0: Since / Age, 1: Between Two Dates
+    var startDate by remember { mutableStateOf(LocalDate.of(2000, 1, 1)) }
+    var endDate by remember { mutableStateOf(LocalDate.now()) }
+    var pickingStart by remember { mutableStateOf(false) }
+    var pickingEnd by remember { mutableStateOf(false) }
+
     var showSaveDialog by remember { mutableStateOf(false) }
     var editingCalculation by remember { mutableStateOf<DateCalculation?>(null) }
-    
-    var startDate by remember { mutableStateOf(LocalDate.now().minusYears(25)) }
-    var endDate by remember { mutableStateOf(LocalDate.now()) }
-    
-    val dateDifference = remember(startDate, endDate) {
-        calculateDateDifference(startDate, endDate)
+    var pendingDelete by remember { mutableStateOf<DateCalculation?>(null) }
+
+    val effectiveEndDate = if (modeIndex == 0) LocalDate.now() else endDate
+    val diff = remember(startDate, effectiveEndDate) {
+        calculateDateDifference(startDate, effectiveEndDate)
     }
-    
+    val westernZodiac = remember(startDate) { WesternZodiac.fromDate(startDate) }
+    val chineseZodiac = remember(startDate) { ChineseZodiac.fromYear(startDate.year) }
+    val milestones = remember(diff.years) { getAgeMilestones(diff.years) }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("📅 Year Calculator") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showCalculator = !showCalculator }) {
-                        Icon(
-                            if (showCalculator) Icons.AutoMirrored.Filled.List else Icons.Default.Add,
-                            if (showCalculator) "View saved" else "New calculation"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        },
-        floatingActionButton = {
-            if (showCalculator) {
-                FloatingActionButton(
-                    onClick = { showSaveDialog = true },
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Default.Save, "Save calculation")
-                }
-            }
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            AnimatedContent(
-                targetState = showCalculator,
-                transitionSpec = {
-                    slideInHorizontally { if (targetState) it else -it } + fadeIn() togetherWith
-                            slideOutHorizontally { if (targetState) -it else it } + fadeOut()
-                }
-            ) { isCalculatorView ->
-                if (isCalculatorView) {
-                    CalculatorView(
-                        startDate = startDate,
-                        endDate = endDate,
-                        dateDifference = dateDifference,
-                        onStartDateChange = { startDate = it },
-                        onEndDateChange = { endDate = it }
-                    )
-                } else {
-                    SavedCalculationsView(
-                        calculations = savedCalculations,
-                        onCalculationClick = { calc ->
-                            startDate = calc.startDate.toLocalDate()
-                            endDate = calc.endDate.toLocalDate()
-                            showCalculator = true
-                        },
-                        onCalculationDelete = { calc ->
-                            scope.launch {
-                                dateCalculationDao.deleteCalculation(calc)
-                            }
-                        }
-                    )
-                }
-            }
-        }
-        
-        if (showSaveDialog) {
-            SaveCalculationDialog(
-                startDate = startDate,
-                endDate = endDate,
-                onDismiss = { showSaveDialog = false },
-                onSave = { title, category ->
-                    scope.launch {
-                        val calculation = DateCalculation(
-                            title = title,
-                            category = category,
-                            startDate = startDate.toMillis(),
-                            endDate = endDate.toMillis()
-                        )
-                        dateCalculationDao.insertCalculation(calculation)
-                        showSaveDialog = false
-                        showCalculator = false
-                    }
-                }
+            TimeMachineTopBar(
+                title = "Year & Date Calculator",
+                onBack = onNavigateBack
             )
         }
-    }
-}
-
-@Composable
-fun CalculatorView(
-    startDate: LocalDate,
-    endDate: LocalDate,
-    dateDifference: DateDifference,
-    onStartDateChange: (LocalDate) -> Unit,
-    onEndDateChange: (LocalDate) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            DatePickerCard(
-                title = "Start Date",
-                date = startDate,
-                icon = Icons.Default.CalendarToday,
-                color = MaterialTheme.colorScheme.primary,
-                onDateChange = onStartDateChange
-            )
-        }
-        
-        item {
-            DatePickerCard(
-                title = "End Date",
-                date = endDate,
-                icon = Icons.Default.Event,
-                color = MaterialTheme.colorScheme.secondary,
-                onDateChange = onEndDateChange
-            )
-        }
-        
-        item {
-            TimeDifferenceCard(dateDifference)
-        }
-        
-        item {
-            TotalsCard(dateDifference)
-        }
-        
-        item {
-            ZodiacCard(startDate)
-        }
-        
-        if (dateDifference.nextOccurrence != null && dateDifference.daysUntilNext != null) {
-            item {
-                NextOccurrenceCard(
-                    nextDate = dateDifference.nextOccurrence,
-                    daysUntil = dateDifference.daysUntilNext
-                )
-            }
-        }
-        
-        val milestones = getAgeMilestones(dateDifference.years)
-        if (milestones.isNotEmpty()) {
-            item {
-                MilestonesCard(milestones)
-            }
-        }
-    }
-}
-
-@Composable
-fun DatePickerCard(
-    title: String,
-    date: LocalDate,
-    icon: ImageVector,
-    color: Color,
-    onDateChange: (LocalDate) -> Unit
-) {
-    var showDatePicker by remember { mutableStateOf(false) }
-    
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(color),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(icon, contentDescription = null, tint = Color.White)
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = date.toReadableString(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-            Icon(
-                Icons.Default.Edit,
-                contentDescription = "Change date",
-                tint = color
-            )
-        }
-    }
-    
-    if (showDatePicker) {
-        DatePickerDialog(
-            initialDate = date,
-            onDateSelected = { onDateChange(it); showDatePicker = false },
-            onDismiss = { showDatePicker = false }
-        )
-    }
-}
-
-@Composable
-fun TimeDifferenceCard(difference: DateDifference) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.AccessTime,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    "Time Difference",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                TimeUnit(value = difference.years, label = "Years", emoji = "📅")
-                TimeUnit(value = difference.months, label = "Months", emoji = "📆")
-                TimeUnit(value = difference.days, label = "Days", emoji = "📍")
-            }
-        }
-    }
-}
-
-@Composable
-fun TimeUnit(value: Long, label: String, emoji: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = emoji,
-            fontSize = 32.sp
-        )
-        Text(
-            text = value.toString(),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-fun TotalsCard(difference: DateDifference) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Calculate,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(28.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    "Total Time",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                TotalRow("Years", String.format("%.2f", difference.totalYears), "🗓️")
-                TotalRow("Months", difference.totalMonths.toString(), "📅")
-                TotalRow("Weeks", difference.totalWeeks.toString(), "📊")
-                TotalRow("Days", difference.totalDays.toString(), "☀️")
-                TotalRow("Hours", difference.totalHours.toString(), "⏰")
-                TotalRow("Minutes", difference.totalMinutes.toString(), "⏱️")
-                TotalRow("Seconds", difference.totalSeconds.toString(), "⚡")
-            }
-        }
-    }
-}
-
-@Composable
-fun TotalRow(label: String, value: String, emoji: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = emoji, fontSize = 20.sp)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
-    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-}
-
-@Composable
-fun ZodiacCard(date: LocalDate) {
-    val westernZodiac = WesternZodiac.fromDate(date)
-    val chineseZodiac = ChineseZodiac.fromYear(date.year)
-    
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer
-        )
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Stars,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(28.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    "Zodiac Signs",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Western Zodiac
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = westernZodiac.symbol,
-                    fontSize = 40.sp
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(
-                        text = "Western Zodiac",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = westernZodiac.displayName,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.tertiary
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Chinese Zodiac
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = chineseZodiac.symbol,
-                    fontSize = 40.sp
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Chinese Zodiac",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "${chineseZodiac.displayName} (${chineseZodiac.element})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.tertiary
-                    )
-                    Text(
-                        text = chineseZodiac.traits,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun NextOccurrenceCard(nextDate: LocalDate, daysUntil: Long) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                Icons.Default.Cake,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(48.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "Next Occurrence",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            Text(
-                nextDate.toReadableString(),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.secondary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "In $daysUntil days",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        }
-    }
-}
-
-@Composable
-fun MilestonesCard(milestones: List<String>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-        )
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(28.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    "Milestone",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            milestones.forEach { milestone ->
-                Text(
-                    text = milestone,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SavedCalculationsView(
-    calculations: List<DateCalculation>,
-    onCalculationClick: (DateCalculation) -> Unit,
-    onCalculationDelete: (DateCalculation) -> Unit
-) {
-    if (calculations.isEmpty()) {
-        EmptyStateView()
-    } else {
+    ) { innerPadding ->
         LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(calculations, key = { it.id }) { calculation ->
-                SavedCalculationCard(
-                    calculation = calculation,
-                    onClick = { onCalculationClick(calculation) },
-                    onDelete = { onCalculationDelete(calculation) }
-                )
-            }
-        }
-    }
-}
+            item(key = "calc_inputs") {
+                SectionCard {
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = modeIndex == 0,
+                            onClick = { modeIndex = 0 },
+                            shape = SegmentedButtonDefaults.itemShape(0, 2)
+                        ) { Text("Age / Elapsed") }
+                        SegmentedButton(
+                            selected = modeIndex == 1,
+                            onClick = { modeIndex = 1 },
+                            shape = SegmentedButtonDefaults.itemShape(1, 2)
+                        ) { Text("Between Dates") }
+                    }
 
-@Composable
-fun SavedCalculationCard(
-    calculation: DateCalculation,
-    onClick: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val startDate = calculation.startDate.toLocalDate()
-    val endDate = calculation.endDate.toLocalDate()
-    val difference = calculateDateDifference(startDate, endDate)
-    
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Category icon
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.secondary
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = getCategoryEmoji(calculation.category),
-                    fontSize = 28.sp
-                )
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = calculation.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = calculation.category,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${difference.years}y ${difference.months}m ${difference.days}d",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (difference.daysUntilNext != null) {
-                    Text(
-                        text = "Next in ${difference.daysUntilNext} days",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-            }
-            
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun EmptyStateView() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Text(
-                text = "📅",
-                fontSize = 80.sp
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "No Saved Calculations",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Tap + to create your first date calculation",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SaveCalculationDialog(
-    startDate: LocalDate,
-    endDate: LocalDate,
-    onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
-) {
-    var title by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(DateCategories.BIRTHDAY) }
-    var customCategory by remember { mutableStateOf("") }
-    var showCategoryMenu by remember { mutableStateOf(false) }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Save, contentDescription = null) },
-        title = { Text("Save Calculation") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Title") },
-                    placeholder = { Text("e.g., My Birthday, Anniversary") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                
-                ExposedDropdownMenuBox(
-                    expanded = showCategoryMenu,
-                    onExpandedChange = { showCategoryMenu = it }
-                ) {
-                    OutlinedTextField(
-                        value = if (selectedCategory == DateCategories.CUSTOM) customCategory else selectedCategory,
-                        onValueChange = {},
-                        readOnly = selectedCategory != DateCategories.CUSTOM,
-                        label = { Text("Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showCategoryMenu) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
-                    )
-                    
-                    ExposedDropdownMenu(
-                        expanded = showCategoryMenu,
-                        onDismissRequest = { showCategoryMenu = false }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        DateCategories.DEFAULT_CATEGORIES.forEach { category ->
-                            DropdownMenuItem(
-                                text = { 
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(getCategoryEmoji(category))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(category)
-                                    }
-                                },
-                                onClick = {
-                                    selectedCategory = category
-                                    showCategoryMenu = false
-                                }
+                        OutlinedButton(
+                            onClick = { pickingStart = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = if (modeIndex == 0) "From: ${startDate.toShortString()}"
+                                else "Start: ${startDate.toShortString()}",
+                                maxLines = 1
                             )
+                        }
+                        if (modeIndex == 1) {
+                            OutlinedButton(
+                                onClick = { pickingEnd = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("End: ${endDate.toShortString()}", maxLines = 1)
+                            }
                         }
                     }
                 }
-                
-                if (selectedCategory == DateCategories.CUSTOM) {
-                    OutlinedTextField(
-                        value = customCategory,
-                        onValueChange = { customCategory = it },
-                        label = { Text("Custom Category Name") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+            }
+
+            item(key = "calc_results") {
+                SectionCard {
+                    Text(
+                        text = if (diff.isNegative) "UNTIL TARGET DATE" else "ELAPSED DIFFERENCE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${diff.years} yrs • ${diff.months} mos • ${diff.days} days",
+                        style = MaterialTheme.typography.headlineSmall.merge(TabularNumberStyle),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        DateStatColumn("Days", diff.totalDays.toString())
+                        DateStatColumn("Weeks", diff.totalWeeks.toString())
+                        DateStatColumn("Months", diff.totalMonths.toString())
+                        DateStatColumn("Hours", diff.totalHours.toString())
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "${westernZodiac.symbol} ${westernZodiac.displayName} • ${chineseZodiac.symbol} Year of the ${chineseZodiac.displayName} (${chineseZodiac.element})",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    diff.daysUntilNext?.let { daysNext ->
+                        Text(
+                            text = "Next anniversary in $daysNext day${if (daysNext == 1L) "" else "s"} (${diff.nextOccurrence?.toShortString()})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (milestones.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = milestones.joinToString(" • "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            editingCalculation = null
+                            showSaveDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text("Save Milestone")
+                    }
+                }
+            }
+
+            item(key = "saved_header") {
+                Text("Saved Milestones (${savedList.size})", style = MaterialTheme.typography.titleMedium)
+            }
+
+            if (savedList.isEmpty()) {
+                item(key = "empty_dates") {
+                    EmptyStateView(
+                        emoji = "🎂",
+                        title = "No Saved Dates Yet",
+                        subtitle = "Save birthdays, anniversaries, work milestones, or countdowns above."
+                    )
+                }
+            } else {
+                items(savedList, key = { it.id }) { item ->
+                    val sDate = item.startDate.toLocalDate()
+                    val eDate = if (modeIndex == 0 && item.endDate == item.startDate) LocalDate.now() else LocalDate.now()
+                    val itemDiff = calculateDateDifference(sDate, eDate)
+                    SectionCard {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(item.title, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    "${item.category} • ${sDate.toReadableString()}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "${itemDiff.years}y ${itemDiff.months}m ${itemDiff.days}d • Next in ${itemDiff.daysUntilNext ?: 0}d",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            IconButton(onClick = {
+                                editingCalculation = item
+                                startDate = sDate
+                                endDate = item.endDate.toLocalDate()
+                                showSaveDialog = true
+                            }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(18.dp))
+                            }
+                            IconButton(onClick = { pendingDelete = item }) {
+                                Icon(
+                                    Icons.Default.DeleteOutline,
+                                    contentDescription = "Delete",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (pickingStart) {
+        M3DatePickerModal(
+            initialDate = startDate,
+            onDismiss = { pickingStart = false },
+            onDateSelected = { startDate = it }
+        )
+    }
+    if (pickingEnd) {
+        M3DatePickerModal(
+            initialDate = endDate,
+            onDismiss = { pickingEnd = false },
+            onDateSelected = { endDate = it }
+        )
+    }
+
+    if (showSaveDialog) {
+        SaveDateDialog(
+            existing = editingCalculation,
+            startDate = startDate,
+            endDate = effectiveEndDate,
+            onDismiss = { showSaveDialog = false },
+            onSave = { item, isEdit ->
+                viewModel.saveCalculation(item, isEdit)
+                showSaveDialog = false
+            }
+        )
+    }
+
+    pendingDelete?.let { item ->
+        ConfirmDeleteDialog(
+            title = "Delete Saved Date?",
+            message = "Remove \"${item.title}\"?",
+            onDismiss = { pendingDelete = null },
+            onConfirm = {
+                viewModel.deleteCalculation(item)
+                pendingDelete = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun DateStatColumn(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.titleSmall.merge(TabularNumberStyle), fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun SaveDateDialog(
+    existing: DateCalculation?,
+    startDate: LocalDate,
+    endDate: LocalDate,
+    onDismiss: () -> Unit,
+    onSave: (DateCalculation, Boolean) -> Unit
+) {
+    var title by remember { mutableStateOf(existing?.title ?: "") }
+    var category by remember { mutableStateOf(existing?.category ?: DateCategories.BIRTHDAY) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (existing == null) "Save Milestone" else "Edit Milestone") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title (e.g. Mom's Birthday)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    DateCategories.DEFAULT_CATEGORIES.forEach { cat ->
+                        FilterChip(
+                            selected = category == cat,
+                            onClick = { category = cat },
+                            label = { Text(cat) }
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
             Button(
+                enabled = title.isNotBlank(),
                 onClick = {
-                    if (title.isNotBlank()) {
-                        val finalCategory = if (selectedCategory == DateCategories.CUSTOM && customCategory.isNotBlank()) {
-                            customCategory
-                        } else {
-                            selectedCategory
-                        }
-                        onSave(title, finalCategory)
-                    }
-                },
-                enabled = title.isNotBlank() && (selectedCategory != DateCategories.CUSTOM || customCategory.isNotBlank())
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DatePickerDialog(
-    initialDate: LocalDate,
-    onDateSelected: (LocalDate) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = initialDate.toMillis()
-    )
-    
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        onDateSelected(millis.toLocalDate())
-                    }
+                    val nowMs = System.currentTimeMillis()
+                    onSave(
+                        DateCalculation(
+                            id = existing?.id ?: 0L,
+                            title = title.trim(),
+                            category = category,
+                            startDate = startDate.toMillis(),
+                            endDate = endDate.toMillis(),
+                            createdAt = existing?.createdAt ?: nowMs,
+                            updatedAt = nowMs
+                        ),
+                        existing != null
+                    )
                 }
-            ) {
-                Text("OK")
-            }
+            ) { Text("Save") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    ) {
-        DatePicker(state = datePickerState)
-    }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
-
-fun getCategoryEmoji(category: String): String {
-    return when (category) {
-        DateCategories.BIRTHDAY -> "🎂"
-        DateCategories.ANNIVERSARY -> "💑"
-        DateCategories.RELATIONSHIP -> "❤️"
-        DateCategories.WORK -> "💼"
-        DateCategories.MEMORIAL -> "🕯️"
-        DateCategories.CUSTOM -> "⭐"
-        else -> "📅"
-    }
-}
-

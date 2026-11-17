@@ -1,55 +1,41 @@
 package me.aliahad.timemanager
 
 import androidx.compose.ui.graphics.Color
+import me.aliahad.timemanager.core.common.Formatters
+import me.aliahad.timemanager.core.common.SafeDateTime
 import me.aliahad.timemanager.data.DailyTask
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 object DailyPlannerUtils {
-    
-    private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-    private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-    private val displayTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
-    
-    fun getTodayDateString(): String {
-        return LocalDate.now().format(dateFormatter)
-    }
-    
-    fun formatDateForDisplay(dateString: String): String {
-        val date = LocalDate.parse(dateString, dateFormatter)
-        val today = LocalDate.now()
-        
+
+    fun getTodayDateString(): String = LocalDate.now().format(SafeDateTime.ISO_DATE)
+
+    fun formatDateForDisplay(dateString: String, today: LocalDate = LocalDate.now()): String {
+        val date = SafeDateTime.parseLocalDateOrNull(dateString) ?: return dateString
         return when {
             date.isEqual(today) -> "Today"
             date.isEqual(today.plusDays(1)) -> "Tomorrow"
             date.isEqual(today.minusDays(1)) -> "Yesterday"
-            else -> date.format(DateTimeFormatter.ofPattern("EEE, MMM d"))
+            else -> date.format(SafeDateTime.DISPLAY_DATE_WEEKDAY)
         }
     }
-    
+
     fun formatTimeForDisplay(timeString: String): String {
-        val time = LocalTime.parse(timeString, timeFormatter)
-        return time.format(displayTimeFormatter)
+        val time = SafeDateTime.parseLocalTimeOrNull(timeString) ?: return timeString
+        return time.format(SafeDateTime.DISPLAY_TIME)
     }
-    
+
     fun calculateDuration(startTime: String, endTime: String): Int {
-        val start = LocalTime.parse(startTime, timeFormatter)
-        val end = LocalTime.parse(endTime, timeFormatter)
+        val start = SafeDateTime.parseLocalTimeOrNull(startTime) ?: return 0
+        val end = SafeDateTime.parseLocalTimeOrNull(endTime) ?: return 0
         val duration = ChronoUnit.MINUTES.between(start, end).toInt()
-        // Handle negative duration (end before start or overnight tasks)
-        return if (duration < 0) duration + (24 * 60) else duration
+        return if (duration <= 0) duration + (24 * 60) else duration
     }
-    
-    fun getDurationText(minutes: Int): String {
-        return when {
-            minutes < 60 -> "${minutes}m"
-            minutes % 60 == 0 -> "${minutes / 60}h"
-            else -> "${minutes / 60}h ${minutes % 60}m"
-        }
-    }
-    
+
+    fun getDurationText(minutes: Int): String = Formatters.formatMinutes(minutes)
+
     fun getTaskTypeIcon(type: String): String {
         return when (type) {
             "TASK" -> "📝"
@@ -60,7 +46,7 @@ object DailyPlannerUtils {
             else -> "📋"
         }
     }
-    
+
     fun getTaskTypeColor(type: String): Color {
         return when (type) {
             "TASK" -> Color(0xFF4DABF7)
@@ -71,7 +57,7 @@ object DailyPlannerUtils {
             else -> Color(0xFF868E96)
         }
     }
-    
+
     fun getCategoryIcon(category: String): String {
         return when (category) {
             "Work" -> "💼"
@@ -85,96 +71,110 @@ object DailyPlannerUtils {
             else -> "📋"
         }
     }
-    
+
     fun getPriorityColor(priority: String): Color {
-        return when (priority) {
-            "High" -> Color(0xFFFF6B6B)
-            "Medium" -> Color(0xFFFFD93D)
-            "Low" -> Color(0xFF51CF66)
+        return when (priority.lowercase()) {
+            "high" -> Color(0xFFFF6B6B)
+            "medium" -> Color(0xFFFFB74D)
+            "low" -> Color(0xFF51CF66)
             else -> Color(0xFF868E96)
         }
     }
-    
-    fun getTimeSlots(): List<String> {
-        return (0..23).map { hour ->
-            String.format("%02d:00", hour)
-        }
-    }
-    
+
+    fun getTimeSlots(): List<String> = (0..23).map { Formatters.formatHourLabel(it) }
+
     fun isTimeInSlot(taskTime: String, slotTime: String): Boolean {
-        val task = LocalTime.parse(taskTime, timeFormatter)
-        val slot = LocalTime.parse(slotTime, timeFormatter)
+        val task = SafeDateTime.parseLocalTimeOrNull(taskTime) ?: return false
+        val slot = SafeDateTime.parseLocalTimeOrNull(slotTime) ?: return false
         return task.hour == slot.hour
     }
-    
+
     fun calculateProgress(tasks: List<DailyTask>): Float {
         if (tasks.isEmpty()) return 0f
         val completed = tasks.count { it.isCompleted }
         return completed.toFloat() / tasks.size.toFloat()
     }
-    
-    fun getCompletionText(completed: Int, total: Int): String {
-        return "$completed of $total completed"
+
+    fun getCompletionText(completed: Int, total: Int): String = "$completed of $total completed"
+
+    private fun toMinuteSegments(startTime: String, endTime: String): List<IntRange> {
+        val start = SafeDateTime.parseLocalTimeOrNull(startTime) ?: return emptyList()
+        val end = SafeDateTime.parseLocalTimeOrNull(endTime) ?: return emptyList()
+        val startMin = start.hour * 60 + start.minute
+        val endMin = end.hour * 60 + end.minute
+        return when {
+            endMin > startMin -> listOf(startMin until endMin)
+            endMin < startMin -> listOf(startMin until 1440, 0 until endMin) // Overnight wrap
+            else -> emptyList()
+        }
     }
-    
+
+    private fun rangesOverlap(a: IntRange, b: IntRange): Boolean {
+        return a.first <= b.last && b.first <= a.last
+    }
+
     fun isTaskOverlapping(task1: DailyTask, task2: DailyTask): Boolean {
-        val start1 = LocalTime.parse(task1.startTime, timeFormatter)
-        val end1 = LocalTime.parse(task1.endTime, timeFormatter)
-        val start2 = LocalTime.parse(task2.startTime, timeFormatter)
-        val end2 = LocalTime.parse(task2.endTime, timeFormatter)
-        
-        return start1.isBefore(end2) && start2.isBefore(end1)
+        val segs1 = toMinuteSegments(task1.startTime, task1.endTime)
+        val segs2 = toMinuteSegments(task2.startTime, task2.endTime)
+        return segs1.any { s1 -> segs2.any { s2 -> rangesOverlap(s1, s2) } }
     }
-    
-    fun getCurrentTimeSlot(): String {
-        val now = LocalTime.now()
-        return String.format("%02d:00", now.hour)
+
+    fun getCurrentTimeSlot(now: LocalTime = LocalTime.now()): String = Formatters.formatHourLabel(now.hour)
+
+    fun isTaskNow(
+        task: DailyTask,
+        today: LocalDate = LocalDate.now(),
+        now: LocalTime = LocalTime.now()
+    ): Boolean {
+        val todayStr = today.format(SafeDateTime.ISO_DATE)
+        val taskDate = SafeDateTime.parseLocalDateOrNull(task.date) ?: return false
+        val start = SafeDateTime.parseLocalTimeOrNull(task.startTime) ?: return false
+        val end = SafeDateTime.parseLocalTimeOrNull(task.endTime) ?: return false
+        val nowMin = now.hour * 60 + now.minute
+        val startMin = start.hour * 60 + start.minute
+        val endMin = end.hour * 60 + end.minute
+
+        return if (endMin >= startMin) {
+            task.date == todayStr && nowMin in startMin until endMin
+        } else {
+            // Overnight: active from startTime on task.date until 23:59, OR 00:00..endTime on next day
+            (task.date == todayStr && nowMin >= startMin) ||
+                (taskDate.plusDays(1) == today && nowMin < endMin)
+        }
     }
-    
-    fun isTaskNow(task: DailyTask): Boolean {
-        // Only check if task is today
-        val today = LocalDate.now().format(dateFormatter)
-        if (task.date != today) return false
-        
-        val now = LocalTime.now()
-        val start = LocalTime.parse(task.startTime, timeFormatter)
-        val end = LocalTime.parse(task.endTime, timeFormatter)
-        return !now.isBefore(start) && now.isBefore(end)
-    }
-    
-    fun isTaskUpcoming(task: DailyTask): Boolean {
-        // Only check if task is today
-        val today = LocalDate.now().format(dateFormatter)
-        if (task.date != today) return false
-        
-        val now = LocalTime.now()
-        val start = LocalTime.parse(task.startTime, timeFormatter)
+
+    fun isTaskUpcoming(
+        task: DailyTask,
+        today: LocalDate = LocalDate.now(),
+        now: LocalTime = LocalTime.now()
+    ): Boolean {
+        val todayStr = today.format(SafeDateTime.ISO_DATE)
+        if (task.date != todayStr) return false
+        val start = SafeDateTime.parseLocalTimeOrNull(task.startTime) ?: return false
         val diff = ChronoUnit.MINUTES.between(now, start)
-        return diff in 1..30 // Within next 30 minutes
+        return diff in 1..30
     }
-    
-    // Validate time format
-    fun isValidTimeFormat(time: String): Boolean {
-        return try {
-            LocalTime.parse(time, timeFormatter)
-            true
-        } catch (e: Exception) {
-            false
-        }
+
+    fun isValidTimeFormat(time: String): Boolean = SafeDateTime.parseLocalTimeOrNull(time) != null
+
+    fun isEndTimeValid(startTime: String, endTime: String, allowOvernight: Boolean = true): Boolean {
+        val start = SafeDateTime.parseLocalTimeOrNull(startTime) ?: return false
+        val end = SafeDateTime.parseLocalTimeOrNull(endTime) ?: return false
+        return if (allowOvernight) start != end else end.isAfter(start)
     }
-    
-    // Check if end time is after start time
+
     fun isEndTimeAfterStart(startTime: String, endTime: String): Boolean {
-        return try {
-            val start = LocalTime.parse(startTime, timeFormatter)
-            val end = LocalTime.parse(endTime, timeFormatter)
-            end.isAfter(start)
-        } catch (e: Exception) {
-            false
-        }
+        return isEndTimeValid(startTime, endTime, allowOvernight = true)
     }
-    
-    // Default onboarding tasks
+
+    fun matchesRecurringDay(recurringDays: String, date: LocalDate): Boolean {
+        if (recurringDays.isBlank()) return true
+        val tokens = recurringDays.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        val dayNum = date.dayOfWeek.value.toString()
+        val shortName = date.dayOfWeek.name.take(3).lowercase()
+        return tokens.any { it == dayNum || it == shortName }
+    }
+
     fun getOnboardingTasks(date: String): List<DailyTask> {
         return listOf(
             DailyTask(
@@ -186,94 +186,45 @@ object DailyPlannerUtils {
                 taskType = "ROUTINE",
                 category = "Personal",
                 icon = "🌅",
-                color = 0xFF9775FA,
+                color = 0xFF9775FAL,
                 priority = "Low"
-            ),
-            DailyTask(
-                title = "Get Started",
-                description = "Welcome to Daily Planner! Let's set up your day",
-                date = date,
-                startTime = "09:00",
-                endTime = "09:30",
-                taskType = "TASK",
-                category = "Personal",
-                icon = "🚀",
-                color = 0xFF4DABF7,
-                priority = "High"
-            ),
-            DailyTask(
-                title = "Add Your First Task",
-                description = "Tap + to create your own tasks and events",
-                date = date,
-                startTime = "10:00",
-                endTime = "10:30",
-                taskType = "TASK",
-                category = "Personal",
-                icon = "✨",
-                color = 0xFF51CF66,
-                priority = "High"
             ),
             DailyTask(
                 title = "Focus Block",
-                description = "Deep work session - your most important task",
+                description = "Tap Start Focus to run a timed work sprint",
                 date = date,
-                startTime = "11:00",
-                endTime = "12:00",
+                startTime = "10:00",
+                endTime = "11:00",
                 taskType = "FOCUS",
                 category = "Work",
                 icon = "🎯",
-                color = 0xFFFF6B6B,
+                color = 0xFFFF6B6BL,
                 priority = "High"
             ),
             DailyTask(
-                title = "Lunch Break",
-                description = "Take a proper break. You deserve it!",
+                title = "Quick Break",
+                description = "Step away from screens and stretch",
                 date = date,
                 startTime = "13:00",
-                endTime = "14:00",
-                taskType = "BREAK",
-                category = "Personal",
-                icon = "🍽️",
-                color = 0xFFFFD93D,
-                priority = "Medium"
-            ),
-            DailyTask(
-                title = "Afternoon Tasks",
-                description = "Tackle your to-do list",
-                date = date,
-                startTime = "15:00",
-                endTime = "16:00",
-                taskType = "TASK",
-                category = "Work",
-                icon = "📋",
-                color = 0xFF4DABF7,
-                priority = "Medium"
-            ),
-            DailyTask(
-                title = "Quick Stretch",
-                description = "Brief 15m break. Move your body!",
-                date = date,
-                startTime = "16:30",
-                endTime = "16:45",
+                endTime = "13:30",
                 taskType = "BREAK",
                 category = "Health",
-                icon = "🧘",
-                color = 0xFFFFD93D,
-                priority = "Low"
+                icon = "☕",
+                color = 0xFFFFD93DL,
+                priority = "Medium"
             ),
             DailyTask(
-                title = "Wind Down",
-                description = "Reflect on your day and prepare for tomorrow",
+                title = "Evening Review",
+                description = "Wrap up tasks and check your habit streak",
                 date = date,
                 startTime = "20:00",
-                endTime = "20:30",
+                endTime = "20:20",
                 taskType = "ROUTINE",
                 category = "Personal",
                 icon = "🌙",
-                color = 0xFF9775FA,
+                color = 0xFF4DABF7L,
                 priority = "Low"
             )
         )
     }
 }
-

@@ -29,7 +29,6 @@ enum class BMIClassification(val displayName: String) {
     DGE("DGE (German Nutrition Society)")
 }
 
-// WHO BMI Categories (Standard International)
 enum class WHOBMICategory(
     val displayName: String,
     val minBMI: Float,
@@ -44,41 +43,45 @@ enum class WHOBMICategory(
     OBESE_CLASS_I("Obese Class I", 30f, 35f, 0xFFFF7043),
     OBESE_CLASS_II("Obese Class II", 35f, 40f, 0xFFE53935),
     OBESE_CLASS_III("Obese Class III", 40f, Float.MAX_VALUE, 0xFFB71C1C);
-    
+
     companion object {
         fun fromBMI(bmi: Float): WHOBMICategory {
-            return values().find { bmi >= it.minBMI && bmi < it.maxBMI } ?: OBESE_CLASS_III
+            return entries.find { bmi >= it.minBMI && bmi < it.maxBMI } ?: OBESE_CLASS_III
         }
     }
 }
 
-// DGE BMI Categories (Age and Gender adjusted)
 data class DGEBMIRange(
     val minBMI: Float,
     val maxBMI: Float,
     val category: String
 )
 
+/**
+ * DGE age- and gender-adjusted BMI reference ranges.
+ * Women have a 1.0 lower reference band than men in DGE guidelines.
+ */
 object DGEClassification {
     fun getCategory(bmi: Float, age: Int, gender: Gender): String {
         val range = getIdealRange(age, gender)
         return when {
             bmi < range.minBMI -> "Underweight"
             bmi <= range.maxBMI -> "Normal"
-            bmi <= range.maxBMI + 5 -> "Overweight"
+            bmi <= range.maxBMI + 5f -> "Overweight"
             else -> "Obese"
         }
     }
-    
+
     fun getIdealRange(age: Int, gender: Gender): DGEBMIRange {
-        return when {
-            age < 25 -> DGEBMIRange(19f, 24f, "Young Adult")
-            age < 35 -> DGEBMIRange(20f, 25f, "Adult")
-            age < 45 -> DGEBMIRange(21f, 26f, "Middle Age")
-            age < 55 -> DGEBMIRange(22f, 27f, "Mature")
-            age < 65 -> DGEBMIRange(23f, 28f, "Senior")
-            else -> DGEBMIRange(24f, 29f, "Elderly")
+        val shift = if (gender == Gender.FEMALE) -1f else 0f
+        val (minBmi, maxBmi, label) = when {
+            age < 25 -> Triple(19f, 24f, "Young Adult")
+            age < 35 -> Triple(20f, 25f, "Adult")
+            age < 45 -> Triple(21f, 26f, "Middle Age")
+            age < 55 -> Triple(22f, 27f, "Mature")
+            age < 65 -> Triple(23f, 28f, "Senior")
+            else -> Triple(24f, 29f, "Elderly")
         }
+        return DGEBMIRange(minBmi + shift, maxBmi + shift, label)
     }
 }
-

@@ -43,9 +43,10 @@ misc.xml
 deploymentTargetDropDown.xml
 render.experimental.xml
 
-# Keystore files (IMPORTANT: Never commit real keystores!)
+# Keystore & APK signature metadata (IMPORTANT: Never commit real keystores!)
 *.jks
 *.keystore
+*.idsig
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild
