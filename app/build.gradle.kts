@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,16 +8,36 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+val configuredStoreFile = keystoreProperties.getProperty("storeFile")
+    ?.takeIf { it.isNotBlank() }
+    ?.let { rootProject.file(it) }
+val hasReleaseSigning = keystorePropertiesFile.exists() &&
+    configuredStoreFile?.exists() == true &&
+    !keystoreProperties.getProperty("storePassword").isNullOrBlank() &&
+    !keystoreProperties.getProperty("keyAlias").isNullOrBlank() &&
+    !keystoreProperties.getProperty("keyPassword").isNullOrBlank()
+
 android {
     namespace = "me.aliahad.timemanager"
     compileSdk = 36
 
-    // Signing config removed from source control for security
-    // To sign releases, create a keystore.properties file with:
-    // storeFile=path/to/keystore.jks
-    // storePassword=your_store_password
-    // keyAlias=your_key_alias
-    // keyPassword=your_key_password
+    // Signing credentials are stored outside source control in gitignored keystore.properties
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = configuredStoreFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "me.aliahad.timemanager"
@@ -39,7 +61,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Signing config should be configured locally via keystore.properties
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
