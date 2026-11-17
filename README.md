@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![TimeMachine](https://img.shields.io/badge/version-3.0.0-blue.svg)
+![TimeMachine](https://img.shields.io/badge/version-3.1.0-blue.svg)
 ![Android](https://img.shields.io/badge/platform-Android-green.svg)
 ![Min API](https://img.shields.io/badge/API-31%2B-brightgreen.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-purple.svg)
@@ -67,15 +67,15 @@ Focus Tracker • Screen Time • Habit Tracker • Year Calculator • BMI Calc
 - **Edge-to-Edge** - Immersive full-screen experience
 
 ### 🔧 Technical
-- **Comprehensive** - 58MB APK with 8+ productivity modules
+- **Compact Release** - ~25 MB R8-minified APK across 5 core pillars & utilities
 - **No Ads** - Completely ad-free experience
 - **No Internet Required** - Works 100% offline
-- **Room Database v13** - Robust local data persistence
-- **Lifecycle Aware** - Smart UI updates and state management
-- **Real-time Sync** - Automatic data refresh across all screens
-- **WorkManager** - Battery-efficient background tasks
-- **UsageStats API** - System-level accurate screen time tracking
-- **ProGuard Optimized** - Minified and shrunk for performance
+- **Room Database v14 + DataStore** - Exported schemas, verified migrations, and isolated user preferences
+- **Lifecycle Aware** - Unidirectional data flow with ViewModels & `StateFlow`
+- **Live Focus & Reminders** - Elapsed-time `FocusTimerService`, Android 16/17 Live Updates, and inline notification actions
+- **WorkManager** - Battery-efficient background sync, budget alerts, and daily digests
+- **UsageStats & Glance** - App-attributed screen time analytics, Quick Settings tiles, and Home Screen widgets
+- **ProGuard Optimized** - Minified and resource-shrunk for release performance
 
 ---
 
@@ -83,14 +83,14 @@ Focus Tracker • Screen Time • Habit Tracker • Year Calculator • BMI Calc
 
 ### Download APK
 1. Go to [Releases](https://github.com/LiLabsAI/TimeMachine/releases/latest)
-2. Download `TimeMachineV3.0.0.apk`
+2. Download `TimeMachineV3.1.0.apk`
 3. Enable "Install from Unknown Sources" in your Android settings
 4. Open the APK and install
 
 ### Minimum Requirements
 - **Android 12 (API 31) or higher**
 - **ARM or x86 processor**
-- **~100MB free storage** (58MB APK + data)
+- **~60MB free storage** (~25 MB release APK + local data)
 
 ---
 
@@ -146,7 +146,7 @@ The classic Focus Timer technique:
 ```bash
 # Clone the repository
 git clone https://github.com/LiLabsAI/TimeMachine.git
-cd TimeManager
+cd TimeMachine
 
 # Build debug APK
 ./gradlew assembleDebug
@@ -160,17 +160,25 @@ cd TimeManager
 
 ### Project Structure
 ```
-TimeManager/
+TimeMachine/
 ├── app/
+│   ├── schemas/                         # Exported Room database schemas (v14)
 │   ├── src/main/
 │   │   ├── java/me/aliahad/timemanager/
-│   │   │   ├── MainActivity.kt          # App entry point
-│   │   │   ├── TimerScreen.kt           # Main timer UI
-│   │   │   └── ui/theme/                # Theme & colors
-│   │   ├── res/                         # Resources
+│   │   │   ├── MainActivity.kt          # Edge-to-edge activity host
+│   │   │   ├── Navigation.kt            # Type-safe NavHost & 5-pillar navigation bar
+│   │   │   ├── core/                    # Common formatters, DI container & DataStore
+│   │   │   ├── data/                    # Room entities, DAOs, migrations & repositories
+│   │   │   ├── domain/                  # Cross-module use cases & gateways
+│   │   │   ├── focus/                   # Elapsed-time FocusTimerService & Zen rules
+│   │   │   ├── notifications/           # Multi-channel notification actions & digests
+│   │   │   ├── system/                  # Quick Settings tiles & dynamic app shortcuts
+│   │   │   ├── widgets/                 # Jetpack Glance home screen widgets
+│   │   │   └── ui/                      # Screens, ViewModels, components & M3 theme
+│   │   ├── res/                         # Vector icons, XML configs & resources
 │   │   └── AndroidManifest.xml
-│   ├── build.gradle.kts                 # App config
-│   └── proguard-rules.pro               # ProGuard rules
+│   ├── build.gradle.kts                 # App config (API 31–36, v3.1.0)
+│   └── proguard-rules.pro               # ProGuard/R8 keep rules
 ├── gradle/
 ├── build.gradle.kts                     # Project config
 └── README.md
