@@ -12,7 +12,7 @@
 
 Focus Tracker • Screen Time • Habit Tracker • Year Calculator • BMI Calculator • Expense Tracker • Subscription Tracker • Daily Planner
 
-[Download APK](https://github.com/LiLabsAI/TimeMachine/releases/latest) • [Report Bug](https://github.com/LiLabsAI/TimeMachine/issues) • [Request Feature](https://github.com/LiLabsAI/TimeMachine/issues)
+[Download APK](https://github.com/aliahadmd/TimeMachine/releases/latest) • [Report Bug](https://github.com/aliahadmd/TimeMachine/issues) • [Request Feature](https://github.com/aliahadmd/TimeMachine/issues)
 
 </div>
 
@@ -82,7 +82,7 @@ Focus Tracker • Screen Time • Habit Tracker • Year Calculator • BMI Calc
 ## 📥 Installation
 
 ### Download APK
-1. Go to [Releases](https://github.com/LiLabsAI/TimeMachine/releases/latest)
+1. Go to [Releases](https://github.com/aliahadmd/TimeMachine/releases/latest)
 2. Download `TimeMachineV3.1.0.apk`
 3. Enable "Install from Unknown Sources" in your Android settings
 4. Open the APK and install
@@ -145,7 +145,7 @@ The classic Focus Timer technique:
 
 ```bash
 # Clone the repository
-git clone https://github.com/LiLabsAI/TimeMachine.git
+git clone https://github.com/aliahadmd/TimeMachine.git
 cd TimeMachine
 
 # Build debug APK
@@ -263,7 +263,7 @@ Download `Focus TimerTimer-v1.0.1.apk` below and install on your Android device.
 
 **Minimum Android Version**: Android 12 (API 31)
 
-**Full Changelog**: https://github.com/LiLabsAI/TimeMachine/compare/v1.0.0...v1.0.1
+**Full Changelog**: https://github.com/aliahadmd/TimeMachine/compare/v1.0.0...v1.0.1
 ```
 
 ---
@@ -288,7 +288,7 @@ Copyright (C) 2025-2026 Ali Ahad (LI Labs).
 
 **TimeMachine** is free and open-source software licensed under the **GNU General Public License v3.0 (`GPL-3.0`)**.
 
-- **Study, fork, and contribute:** You are free to study the code, fork this repository, modify it, build from source, and share improvements via pull requests on [GitHub](https://github.com/LiLabsAI/TimeMachine).
+- **Study, fork, and contribute:** You are free to study the code, fork this repository, modify it, build from source, and share improvements via pull requests on [GitHub](https://github.com/aliahadmd/TimeMachine).
 - **Copyleft protection:** Any distributed modified version or derivative work must also be licensed under the **GNU General Public License v3.0** with full source availability. Incorporating TimeMachine code into distributed closed-source proprietary software is not permitted.
 - **Ownership & attribution:** Original authorship and copyright remain with **Ali Ahad**. Redistributions and forks must preserve original copyright notices, attribution notices, [LICENSE](LICENSE), and [NOTICE](NOTICE).
 
@@ -300,7 +300,7 @@ See [LICENSE](LICENSE) for the full GNU GPLv3 text, [NOTICE](NOTICE) for attribu
 
 None at the moment! 🎉
 
-If you find any bugs, please [open an issue](https://github.com/LiLabsAI/TimeMachine/issues).
+If you find any bugs, please [open an issue](https://github.com/aliahadmd/TimeMachine/issues).
 
 ---
 

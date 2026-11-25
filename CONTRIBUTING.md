@@ -1,6 +1,6 @@
 # Contributing to TimeMachine
 
-Contributions, bug reports, forks, and pull requests are welcome on [GitHub](https://github.com/LiLabsAI/TimeMachine).
+Contributions, bug reports, forks, and pull requests are welcome on [GitHub](https://github.com/aliahadmd/TimeMachine).
 
 ## Reporting Issues
 
